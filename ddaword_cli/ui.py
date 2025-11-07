@@ -5,52 +5,6 @@ from __future__ import annotations
 from .config import COLORS, COMMANDS, DDAWORD_ASCII, console
 
 
-class TokenTracker:
-    """Track token usage across the conversation."""
-
-    def __init__(self) -> None:
-        self.baseline_context = 0
-        self.current_context = 0
-        self.last_output = 0
-
-    def set_baseline(self, tokens: int) -> None:
-        self.baseline_context = tokens
-        self.current_context = tokens
-
-    def reset(self) -> None:
-        self.current_context = self.baseline_context
-        self.last_output = 0
-
-    def add(self, input_tokens: int, output_tokens: int) -> None:
-        self.current_context = input_tokens
-        self.last_output = output_tokens
-
-    def display_last(self) -> None:
-        if self.last_output and self.last_output >= 1000:
-            console.print(f"  Generated: {self.last_output:,} tokens", style="dim")
-        if self.current_context:
-            console.print(f"  Current context: {self.current_context:,} tokens", style="dim")
-
-    def display_session(self) -> None:
-        console.print("\n[bold]Token Usage:[/bold]", style=COLORS["primary"])
-        has_conversation = self.current_context > self.baseline_context
-
-        if self.baseline_context > 0:
-            console.print(
-                f"  Baseline: {self.baseline_context:,} tokens",
-                style=COLORS["dim"],
-            )
-
-        if has_conversation:
-            delta = self.current_context - self.baseline_context
-            console.print(
-                f"  Conversation delta: {delta:,} tokens", style=COLORS["dim"]
-            )
-
-        console.print(f"  Total: {self.current_context:,} tokens", style=COLORS["dim"])
-        console.print()
-
-
 def show_interactive_help() -> None:
     """Show available commands during interactive session."""
 
@@ -119,7 +73,6 @@ def show_help() -> None:
     console.print("[bold]Interactive Commands:[/bold]", style=COLORS["primary"])
     console.print("  /help           Show this summary", style=COLORS["dim"])
     console.print("  /clear          Clear screen", style=COLORS["dim"])
-    console.print("  /tokens         Show token usage", style=COLORS["dim"])
     console.print("  /quit, /exit    Exit the session", style=COLORS["dim"])
     console.print()
 

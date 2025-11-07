@@ -7,18 +7,12 @@ from pathlib import Path
 
 from strands_tools import editor, environment, file_read, file_write, http_request, shell,calculator,current_time
 
-from .agent import (
-    create_agent_with_config,
-    get_agent_directory,
-    get_system_prompt,
-    list_agents,
-    reset_agent,
-)
+from .agent import create_agent_with_config, list_agents, reset_agent
 from .commands import execute_bash_command, handle_command
 from .config import COLORS, DDAWORD_ASCII, SessionState, console, create_model
 from .execution import execute_task
 from .input import create_prompt_session
-from .ui import TokenTracker, show_help
+from .ui import show_help
 
 DEFAULT_TOOLS = [file_read, file_write, editor, shell, http_request, environment,calculator,current_time]
 
@@ -97,7 +91,7 @@ def parse_args():
     return parser.parse_args()
 
 
-async def simple_cli(agent, assistant_id: str | None, session_state, baseline_tokens: int = 0):
+async def simple_cli(agent, assistant_id: str | None, session_state):
     """Main CLI loop."""
     console.clear()
     console.print(DDAWORD_ASCII, style=f"bold {COLORS['primary']}")
@@ -119,10 +113,8 @@ async def simple_cli(agent, assistant_id: str | None, session_state, baseline_to
     )
     console.print()
 
-    # Create prompt session and token tracker
+    # Create prompt session
     session = create_prompt_session(assistant_id, session_state)
-    token_tracker = TokenTracker()
-    token_tracker.set_baseline(baseline_tokens)
 
     while True:
         try:
@@ -140,7 +132,7 @@ async def simple_cli(agent, assistant_id: str | None, session_state, baseline_to
 
         # Check for slash commands first
         if user_input.startswith("/"):
-            result = handle_command(user_input, agent, token_tracker)
+            result = handle_command(user_input)
             if result == "exit":
                 console.print("\nGoodbye!", style=COLORS["primary"])
                 break
@@ -158,7 +150,7 @@ async def simple_cli(agent, assistant_id: str | None, session_state, baseline_to
             console.print("\nGoodbye!", style=COLORS["primary"])
             break
 
-        await execute_task(user_input, agent, assistant_id, session_state, token_tracker)
+        await execute_task(user_input, agent, assistant_id, session_state)
 
 
 async def main(assistant_id: str, session_state):
@@ -171,15 +163,8 @@ async def main(assistant_id: str, session_state):
 
     agent = create_agent_with_config(model, assistant_id, tools)
 
-    # Calculate baseline token count for accurate token tracking
-    from .token_utils import calculate_baseline_tokens
-
-    agent_dir = get_agent_directory(assistant_id)
-    system_prompt = get_system_prompt(assistant_id)
-    baseline_tokens = calculate_baseline_tokens(model, system_prompt)
-
     try:
-        await simple_cli(agent, assistant_id, session_state, baseline_tokens)
+        await simple_cli(agent, assistant_id, session_state)
     except Exception as e:
         console.print(f"\n[bold red]❌ Error:[/bold red] {e}\n")
 

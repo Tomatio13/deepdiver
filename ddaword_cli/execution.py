@@ -133,7 +133,6 @@ async def execute_task(
     agent: Any,
     assistant_id: str | None,
     session_state,
-    token_tracker=None,
 ):
     """Execute a task by delegating to the Strands agent."""
 
@@ -157,7 +156,4 @@ async def execute_task(
     console.print()
     console.print(Markdown(response_text), style=COLORS["agent"])
     console.print()
-
-    if token_tracker:
-        token_tracker.add(0, 0)
 

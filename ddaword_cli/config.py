@@ -42,7 +42,6 @@ DDAWORD_ASCII = """
 COMMANDS = {
     "clear": "Clear screen",
     "help": "Show help information",
-    "tokens": "Show token usage for current session",
     "quit": "Exit the CLI",
     "exit": "Exit the CLI",
 }

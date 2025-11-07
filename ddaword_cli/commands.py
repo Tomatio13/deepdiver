@@ -4,10 +4,10 @@ import subprocess
 from pathlib import Path
 
 from .config import COLORS, DDAWORD_ASCII, console
-from .ui import TokenTracker, show_interactive_help
+from .ui import show_interactive_help
 
 
-def handle_command(command: str, agent, token_tracker: TokenTracker) -> str | bool:
+def handle_command(command: str) -> str | bool:
     """Handle slash commands. Returns 'exit' to exit, True if handled, False to pass to agent."""
     cmd = command.lower().strip().lstrip("/")
 
@@ -15,9 +15,6 @@ def handle_command(command: str, agent, token_tracker: TokenTracker) -> str | bo
         return "exit"
 
     if cmd == "clear":
-        # Reset token tracking to baseline
-        token_tracker.reset()
-
         # Clear screen and show fresh UI
         console.clear()
         console.print(DDAWORD_ASCII, style=f"bold {COLORS['primary']}")
@@ -31,10 +28,6 @@ def handle_command(command: str, agent, token_tracker: TokenTracker) -> str | bo
 
     if cmd == "help":
         show_interactive_help()
-        return True
-
-    if cmd == "tokens":
-        token_tracker.display_session()
         return True
 
     console.print()

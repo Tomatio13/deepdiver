@@ -14,7 +14,7 @@ ddaword_cli/
 ├── execution.py     # Task execution + streaming helpers
 ├── input.py         # prompt_toolkit configuration & completions
 ├── main.py          # CLI orchestration / argument parsing
-└── ui.py            # Token tracker + help screens
+└── ui.py            # Help screen renderers
 ```
 
 ### Key modules
@@ -22,10 +22,10 @@ ddaword_cli/
 - **`agent.py`** – Creates Strands `Agent` instances backed by `~/.strands-agents-cli/<agent>/`. Handles listing/resetting profiles and composing system prompts that embed `agent.md` instructions.
 - **`config.py`** – Loads environment variables, provides shared colors/console objects, and resolves model providers via `STRANDS_MODEL_PROVIDER` / `STRANDS_MODEL_CONFIG`.
 - **`execution.py`** – Normalises requests to the agent. Adds referenced file context, uses streaming when available, and falls back to blocking invocation otherwise.
-- **`commands.py`** – Implements `/help`, `/clear`, `/tokens`, and bang-prefixed shell commands.
+- **`commands.py`** – Implements `/help`, `/clear`, and bang-prefixed shell commands.
 - **`input.py`** – Configures prompt_toolkit (multiline input, history, `/` + `@` completions, toolbar bindings).
 - **`main.py`** – Parses CLI flags, performs dependency checks, selects the model, registers default Strands tools (`file_read`, `file_write`, `editor`, `shell`, `http_request`, `environment`), and runs the interactive loop.
-- **`ui.py`** – Provides `TokenTracker` plus interactive/help renderers.
+- **`ui.py`** – Provides interactive/help renderers.
 
 ## Agent storage & prompts
 
@@ -47,8 +47,7 @@ Additional tools can be appended by extending the list before invoking `create_a
 ## Interactive commands
 
 - `/help` – Show an overview of shortcuts and tooling
-- `/clear` – Clear the terminal; token tracker resets to baseline
-- `/tokens` – Display tracked token counts
+- `/clear` – Clear the terminal
 - `/quit` or `/exit` – Terminate the session
 - `!<command>` – Execute a shell command (e.g. `!git status`)
 
