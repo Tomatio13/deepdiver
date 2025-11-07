@@ -62,7 +62,7 @@ def check_cli_dependencies():
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="DDAWord - AI Coding Assistant",
+        description="DDAWord - AI Innovation Assistant",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=False,
     )
@@ -103,7 +103,7 @@ async def simple_cli(agent, assistant_id: str | None, session_state, baseline_to
     console.print(DDAWORD_ASCII, style=f"bold {COLORS['primary']}")
     console.print()
 
-    console.print("... Ready to code! What would you like to build?", style=COLORS["agent"])
+    console.print("... Ready to Innovation! What would you like to create?", style=COLORS["agent"])
     console.print(f"  [dim]Working directory: {Path.cwd()}[/dim]")
     console.print()
 
