@@ -5,7 +5,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-from strands_tools import editor, environment, file_read, file_write, http_request, shell
+from strands_tools import editor, environment, file_read, file_write, http_request, shell,calculator,current_time
 
 from .agent import (
     create_agent_with_config,
@@ -20,7 +20,7 @@ from .execution import execute_task
 from .input import create_prompt_session
 from .ui import TokenTracker, show_help
 
-DEFAULT_TOOLS = [file_read, file_write, editor, shell, http_request, environment]
+DEFAULT_TOOLS = [file_read, file_write, editor, shell, http_request, environment,calculator,current_time]
 
 
 def check_cli_dependencies():

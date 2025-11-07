@@ -1,0 +1,16 @@
+.env
+
+.kiro/
+.serena/
+.venv
+.pytest_cache/
+
+ddaword_cli/__pycache__/
+
+tests/__pycache__/
+
+ddaword_cli.egg-info/
+
+.DS_Store
+
+*.pyc

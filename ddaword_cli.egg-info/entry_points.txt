@@ -1,3 +1,0 @@
-[console_scripts]
-ddaword = ddaword_cli:cli_main
-ddaword-cli = ddaword_cli:cli_main
