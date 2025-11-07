@@ -1,0 +1,7 @@
+strands-agents>=0.2.0
+strands-agents-tools>=0.2.0
+requests
+rich>=13.0.0
+prompt-toolkit>=3.0.52
+python-dotenv
+boto3>=1.34.0
