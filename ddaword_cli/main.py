@@ -160,6 +160,8 @@ async def main(assistant_id: str, session_state):
 
     # Create agent with default tool set
     tools = list(DEFAULT_TOOLS)
+    # Add todo tools (class-based tools with @tool decorator)
+    #tools.extend(create_todo_write_tools())
 
     agent = create_agent_with_config(model, assistant_id, tools)
 

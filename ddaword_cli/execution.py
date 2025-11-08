@@ -93,7 +93,7 @@ def _extract_final_response(event: dict) -> str:
 
 
 async def _invoke_agent(agent: Any, prompt: str) -> str:
-    console.print()
+    # ステータス表示中はconsole.print()を呼び出さない
     if hasattr(agent, "invoke_async"):
         response = await agent.invoke_async(prompt)
         return _stringify_response(response)
@@ -106,7 +106,7 @@ async def _invoke_agent(agent: Any, prompt: str) -> str:
 async def _stream_agent(agent: Any, prompt: str) -> str | None:
     response_buffer: list[str] = []
     final_response = ""
-    console.print()
+    # ステータス表示中はconsole.print()を呼び出さない（ツールイベントやモデルデルタの表示は必要）
     try:
         async for event in agent.stream_async(prompt):
             if not isinstance(event, dict):
@@ -122,8 +122,9 @@ async def _stream_agent(agent: Any, prompt: str) -> str | None:
         combined = final_response or "".join(response_buffer)
         return combined.strip() or None
     except Exception as exc:  # noqa: BLE001 - fall back to non-streaming
+        # エラー時はステータス表示をクリアしてからメッセージを表示
         console.print(
-            f"[yellow]Streaming unavailable, falling back to blocking call ({exc}).[/yellow]"
+            f"\n[yellow]Streaming unavailable, falling back to blocking call ({exc}).[/yellow]"
         )
         return await _invoke_agent(agent, prompt)
 
@@ -140,18 +141,12 @@ async def execute_task(
     
     # 参考コードのパターンに従い、with文でstatusを管理
     # メッセージの最後に\nを追加して、ステータス終了後に改行が入るようにする
-    with console.status(
-        f"[bold {COLORS['thinking']}]Agent is thinking...\n",
-        spinner="aesthetic",speed=1.5
-    ):
-        if hasattr(agent, "stream_async"):
-            response_text = await _stream_agent(agent, final_input)
-        else:
-            response_text = await _invoke_agent(agent, final_input)
 
-    if not response_text:
-        console.print("[dim]Agent returned no content.[/dim]")
-        return
+    if hasattr(agent, "stream_async"):
+        response_text = await _stream_agent(agent, final_input)
+    else:
+        response_text = await _invoke_agent(agent, final_input)
+
 
     console.print()
     console.print(Markdown(response_text), style=COLORS["agent"])

@@ -95,27 +95,14 @@ def reset_agent(agent_name: str, source_agent: str | None = None) -> None:
 def _base_cli_prompt(agent_dir: Path) -> str:
     memory_dir = agent_dir / MEMORY_DIRNAME
     cwd = Path.cwd()
+    working_dir = cwd.name+"/"+"workspace"
     return f"""### CLI Runtime Context
 
-- Working directory: `{cwd}`
+- Working directory: `{working_dir}`
 - Agent profile directory: `{agent_dir}`
 - Persistent memory directory: `{memory_dir}`
-- Runtime stack: Strands Agents SDK + Strands Tools collection
-
-### Tool Usage
-- Use `file_read`, `file_write`, and `editor` for filesystem interactions
-- Run shell commands with the `shell` tool (seek confirmation for destructive actions)
-- Use `http_request` for HTTP APIs and `environment` to manage environment variables
-- Always prefer absolute paths when referencing files or directories
-
-### Memory & Knowledge
-- Store long-term knowledge in the memory directory as Markdown files
-- Before answering questions about prior work, inspect the memory directory for context
-- Keep instructions and preferences in `agent.md`; update it when the user revises your role
-
-### Response Style
-- Be concise and transparent about tool usage when necessary
-- Summarize findings clearly and request clarification when requirements are ambiguous
+- If working directory is not `{working_dir}`, create it and use it.
+- If working directory is `{working_dir}`, use it.
 """
 
 
