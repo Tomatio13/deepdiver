@@ -137,17 +137,17 @@ async def execute_task(
     """Execute a task by delegating to the Strands agent."""
 
     final_input = _assemble_prompt(user_input)
-    # status = console.status(f"[bold {COLORS['thinking']}]Agent is thinking...", spinner="dots")
-    # status.start()
-
-    try:
+    
+    # 参考コードのパターンに従い、with文でstatusを管理
+    # メッセージの最後に\nを追加して、ステータス終了後に改行が入るようにする
+    with console.status(
+        f"[bold {COLORS['thinking']}]Agent is thinking...\n",
+        spinner="aesthetic",speed=1.5
+    ):
         if hasattr(agent, "stream_async"):
             response_text = await _stream_agent(agent, final_input)
         else:
             response_text = await _invoke_agent(agent, final_input)
-    finally:
-        # status.stop()
-        console.print()
 
     if not response_text:
         console.print("[dim]Agent returned no content.[/dim]")
