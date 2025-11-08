@@ -46,10 +46,9 @@ def check_cli_dependencies():
         print("\nThe following packages are required to use the CLI:")
         for pkg in missing:
             print(f"  - {pkg}")
-        print("\nPlease install them with:")
-        print("  pip install ddaword-cli")
-        print("\nOr install all dependencies:")
-        print("  pip install 'ddaword-cli'")
+        print("\nInstall the development dependencies with:")
+        print("  uv sync")
+        print("\n(If a published package becomes available later, install it via `pip install ddaword-cli`.)")
         sys.exit(1)
 
 

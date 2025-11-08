@@ -163,7 +163,7 @@ def create_prompt_session(assistant_id: str, session_state: SessionState) -> Pro
     """Create a configured PromptSession with all features."""
     # Set default editor if not already set
     if "EDITOR" not in os.environ:
-        os.environ["EDITOR"] = "nano"
+        os.environ["EDITOR"] = "vim"
 
     # Create key bindings
     kb = KeyBindings()
@@ -205,10 +205,11 @@ def create_prompt_session(assistant_id: str, session_state: SessionState) -> Pro
             buffer.validate_and_handle()
             # If empty, do nothing (don't submit)
 
-    # Alt+Enter for newlines (press ESC then Enter, or Option+Enter on Mac)
+    # Alt+Enter (Esc+Enter) か Ctrl+J で改行を挿入
     @kb.add("escape", "enter")
+    @kb.add("c-j")
     def _(event):
-        """Alt+Enter inserts a newline for multi-line input."""
+        """Insert a newline without submitting the buffer."""
         event.current_buffer.insert_text("\n")
 
     # Ctrl+E to open in external editor

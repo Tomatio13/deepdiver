@@ -19,7 +19,7 @@ def show_interactive_help() -> None:
     console.print("[bold]Editing Features:[/bold]", style=COLORS["primary"])
     console.print("  Enter           Submit your message", style=COLORS["dim"])
     console.print(
-        "  Alt+Enter       Insert newline (Option+Enter on Mac, or ESC then Enter)",
+        "  Alt+Enter/Ctrl+J Insert newline (Option+Enter on Mac, or ESC then Enter)",
         style=COLORS["dim"],
     )
     console.print(
@@ -62,7 +62,7 @@ def show_help() -> None:
     console.print("[bold]Interactive Features:[/bold]", style=COLORS["primary"])
     console.print("  Enter           Submit your message", style=COLORS["dim"])
     console.print(
-        "  Alt+Enter       Insert newline (Option+Enter or ESC then Enter)",
+        "  Alt+Enter/Ctrl+J Insert newline (Option+Enter or ESC then Enter)",
         style=COLORS["dim"],
     )
     console.print("  Ctrl+E          Open in external editor", style=COLORS["dim"])
@@ -75,4 +75,3 @@ def show_help() -> None:
     console.print("  /clear          Clear screen", style=COLORS["dim"])
     console.print("  /quit, /exit    Exit the session", style=COLORS["dim"])
     console.print()
-
