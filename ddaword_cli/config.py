@@ -98,6 +98,7 @@ MODEL_CLASS_BY_PROVIDER = {
     "openai": "OpenAIModel",
     "anthropic": "AnthropicModel",
     "ollama": "OllamaModel",
+    "gemini": "GeminiModel",
 }
 
 SENSITIVE_KEYS = {"api_key", "secret", "token", "access_key"}
@@ -114,15 +115,46 @@ def _load_model_config(raw_value: str | None, provider: str) -> dict[str, Any]:
         if region:
             config["region_name"] = region
     elif provider == "openai":
-        if os.environ.get("OPENAI_MODEL"):
-            config["model"] = os.environ["OPENAI_MODEL"]
-        if os.environ.get("OPENAI_API_KEY"):
-            config["api_key"] = os.environ["OPENAI_API_KEY"]
+        # OpenAI互換プロバイダ（LiteLLMなど）に対応
+        # client_argsにapi_keyとbase_urlを設定
+        client_args: dict[str, Any] = {}
+        
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if api_key:
+            client_args["api_key"] = api_key
+        
+        base_url = os.environ.get("OPENAI_BASE_URL")
+        if base_url:
+            client_args["base_url"] = base_url
+        
+        if client_args:
+            config["client_args"] = client_args
+        
+        # model_idを設定（OPENAI_MODELまたはOPENAI_MODEL_IDから取得）
+        model_id = os.environ.get("OPENAI_MODEL_ID") or os.environ.get("OPENAI_MODEL")
+        if model_id:
+            config["model_id"] = model_id
     elif provider == "anthropic":
         if os.environ.get("ANTHROPIC_MODEL"):
             config["model"] = os.environ["ANTHROPIC_MODEL"]
         if os.environ.get("ANTHROPIC_API_KEY"):
             config["api_key"] = os.environ["ANTHROPIC_API_KEY"]
+    elif provider == "gemini":
+        # Geminiプロバイダの設定
+        # client_argsにapi_keyを設定
+        client_args: dict[str, Any] = {}
+        
+        api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+        if api_key:
+            client_args["api_key"] = api_key
+        
+        if client_args:
+            config["client_args"] = client_args
+        
+        # model_idを設定（GEMINI_MODEL_IDまたはGEMINI_MODELから取得）
+        model_id = os.environ.get("GEMINI_MODEL_ID") or os.environ.get("GEMINI_MODEL")
+        if model_id:
+            config["model_id"] = model_id
 
     if not raw_value:
         return config
@@ -146,6 +178,15 @@ def _sanitize_config_for_display(config: dict[str, Any]) -> dict[str, Any]:
     for key, value in config.items():
         if any(token in key.lower() for token in SENSITIVE_KEYS):
             sanitised[key] = "***"
+        elif key == "client_args" and isinstance(value, dict):
+            # client_args内の機密情報もサニタイズ
+            sanitised_client_args: dict[str, Any] = {}
+            for client_key, client_value in value.items():
+                if any(token in client_key.lower() for token in SENSITIVE_KEYS):
+                    sanitised_client_args[client_key] = "***"
+                else:
+                    sanitised_client_args[client_key] = client_value
+            sanitised[key] = sanitised_client_args
         else:
             sanitised[key] = value
     return sanitised
@@ -167,12 +208,14 @@ def get_current_model_info() -> dict[str, str | None]:
     if provider == "bedrock":
         model_name = os.environ.get("BEDROCK_MODEL_ID") or os.environ.get("STRANDS_MODEL_ID")
     elif provider == "openai":
-        model_name = os.environ.get("OPENAI_MODEL")
+        model_name = os.environ.get("OPENAI_MODEL_ID") or os.environ.get("OPENAI_MODEL")
     elif provider == "anthropic":
         model_name = os.environ.get("ANTHROPIC_MODEL")
     elif provider == "ollama":
         # Ollama typically uses OLLAMA_MODEL or model config
         model_name = os.environ.get("OLLAMA_MODEL")
+    elif provider == "gemini":
+        model_name = os.environ.get("GEMINI_MODEL_ID") or os.environ.get("GEMINI_MODEL")
     
     # Check STRANDS_MODEL_CONFIG for model name if not found above
     if not model_name:
