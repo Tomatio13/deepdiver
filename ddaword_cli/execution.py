@@ -72,17 +72,19 @@ def _render_tool_event(event: dict) -> None:
     )
 
 
-def _render_model_delta(event: dict, buffer: list[str]) -> None:
+def _render_model_delta(event: dict, buffer: list[str]) -> bool:
+    """Render model delta and return True if content was rendered."""
     model_event = event.get("model_stream_event")
     if not isinstance(model_event, dict):
-        return
+        return False
 
     delta = model_event.get("delta") or model_event.get("output_text")
     if not isinstance(delta, str) or not delta:
-        return
+        return False
 
     buffer.append(delta)
     console.print(delta, style=COLORS["agent"], end="")
+    return True
 
 
 def _extract_final_response(event: dict) -> str:
@@ -113,6 +115,7 @@ async def _stream_agent(agent: Any, prompt: str) -> str | None:
                 continue
 
             _render_tool_event(event)
+            # モデルデルタをレンダリング（リアルタイム表示）
             _render_model_delta(event, response_buffer)
 
             candidate = _extract_final_response(event)
@@ -144,11 +147,15 @@ async def execute_task(
 
     if hasattr(agent, "stream_async"):
         response_text = await _stream_agent(agent, final_input)
+        # ストリーミング中に既に内容が表示されているため、改行のみ追加
+        console.print()
     else:
         response_text = await _invoke_agent(agent, final_input)
-
-
-    console.print()
-    console.print(Markdown(response_text), style=COLORS["agent"])
-    console.print()
+        # response_textがNoneの場合は空文字列にフォールバック
+        if response_text is None:
+            response_text = ""
+        
+        console.print()
+        console.print(Markdown(response_text), style=COLORS["agent"])
+        console.print()
 

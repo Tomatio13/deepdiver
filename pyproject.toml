@@ -3,7 +3,7 @@ name = "ddaword-cli"
 version = "0.0.8"
 description = "DDAWord CLI"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.11,<4.0"
 dependencies = [
   "strands-agents>=0.2.0",
@@ -106,3 +106,6 @@ enable_error_code = ["deprecated"]
 # Optional: reduce strictness if needed
 disallow_any_generics = false
 warn_return_any = false
+
+[tool.setuptools]
+packages = ["ddaword_cli"]
