@@ -3,11 +3,13 @@
 import subprocess
 from pathlib import Path
 
+from .agent import AGENT_ROOT
 from .config import COLORS, DDAWORD_ASCII, console, get_current_model_info
+from .mcp_tools import get_mcp_server_info
 from .ui import show_interactive_help
 
 
-def handle_command(command: str) -> str | bool:
+def handle_command(command: str, assistant_id: str = "agent") -> str | bool:
     """Handle slash commands. Returns 'exit' to exit, True if handled, False to pass to agent."""
     cmd = command.lower().strip().lstrip("/")
 
@@ -43,6 +45,44 @@ def handle_command(command: str) -> str | bool:
         else:
             console.print("[yellow]No model provider configured.[/yellow]")
             console.print("[dim]Set STRANDS_MODEL_PROVIDER environment variable to configure a model.[/dim]")
+        console.print()
+        return True
+
+    if cmd == "mcp":
+        # Show MCP server information
+        console.print()
+        console.print("[bold]MCP Servers Configuration[/bold]", style=COLORS["primary"])
+        console.print()
+
+        agent_dir = AGENT_ROOT / assistant_id
+        mcp_config_path = agent_dir / "mcp.json"
+
+        if not mcp_config_path.exists():
+            console.print(f"[yellow]No mcp.json found at: {mcp_config_path}[/yellow]")
+            console.print("[dim]Create mcp.json in the agent directory to configure MCP servers.[/dim]")
+            console.print()
+            return True
+
+        server_info_list = get_mcp_server_info(assistant_id)
+        if not server_info_list:
+            console.print("[yellow]No MCP servers configured.[/yellow]")
+            console.print()
+            return True
+
+        for info in server_info_list:
+            status = "[dim](disabled)[/dim]" if info["disabled"] else "[green](enabled)[/green]"
+            console.print(f"  [bold]{info['name']}[/bold] {status}", style=COLORS["agent"])
+            if info["type"]:
+                console.print(f"    Type: {info['type']}", style=COLORS["dim"])
+            if info["connection"]:
+                # Truncate long connection strings
+                conn = info["connection"]
+                if len(conn) > 80:
+                    conn = conn[:77] + "..."
+                console.print(f"    Connection: [dim]{conn}[/dim]", style=COLORS["dim"])
+            console.print()
+
+        console.print(f"[dim]Configuration file: {mcp_config_path}[/dim]")
         console.print()
         return True
 

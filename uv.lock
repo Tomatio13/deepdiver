@@ -567,6 +567,7 @@ version = "0.0.8"
 source = { editable = "." }
 dependencies = [
     { name = "boto3" },
+    { name = "mcp" },
     { name = "openai" },
     { name = "prompt-toolkit" },
     { name = "python-dotenv" },
@@ -603,6 +604,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "boto3", specifier = ">=1.34.0" },
+    { name = "mcp" },
     { name = "openai" },
     { name = "prompt-toolkit", specifier = ">=3.0.52" },
     { name = "python-dotenv" },

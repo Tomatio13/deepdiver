@@ -12,6 +12,7 @@ from .commands import execute_bash_command, handle_command
 from .config import COLORS, DDAWORD_ASCII, SessionState, console, create_model
 from .execution import execute_task
 from .input import create_prompt_session
+from .mcp_tools import load_mcp_tools
 from .ui import show_help
 
 DEFAULT_TOOLS = [file_read, file_write, editor, shell, http_request, environment,calculator,current_time]
@@ -131,7 +132,7 @@ async def simple_cli(agent, assistant_id: str | None, session_state):
 
         # Check for slash commands first
         if user_input.startswith("/"):
-            result = handle_command(user_input)
+            result = handle_command(user_input, assistant_id)
             if result == "exit":
                 console.print("\nGoodbye!", style=COLORS["primary"])
                 break
@@ -162,7 +163,34 @@ async def main(assistant_id: str, session_state):
     # Add todo tools (class-based tools with @tool decorator)
     #tools.extend(create_todo_write_tools())
 
-    agent = create_agent_with_config(model, assistant_id, tools)
+    # Load MCP tools from mcp.json if available
+    mcp_clients = load_mcp_tools(assistant_id)
+    if mcp_clients:
+        # MCPClient implements ToolProvider interface, can be added directly
+        # Strands Agent will handle initialization automatically
+        tools.extend(mcp_clients)
+
+    # Create agent - MCP clients will initialize during agent creation
+    # If some MCP servers fail to initialize, they will be skipped automatically
+    try:
+        agent = create_agent_with_config(model, assistant_id, tools)
+    except (ValueError, Exception) as e:
+        # If agent creation fails due to tool loading errors, try to continue with available tools
+        error_msg = str(e)
+        if "Failed to load tool" in error_msg or "MCP" in error_msg:
+            console.print(
+                "[yellow]Warning: Some MCP servers failed to initialize. "
+                "Continuing with available tools...[/yellow]"
+            )
+            # Try to create agent with just the default tools
+            # This is a fallback - ideally Strands should handle this gracefully
+            try:
+                agent = create_agent_with_config(model, assistant_id, DEFAULT_TOOLS)
+            except Exception:
+                # If that also fails, raise the original error
+                raise e
+        else:
+            raise
 
     try:
         await simple_cli(agent, assistant_id, session_state)

@@ -58,6 +58,7 @@ COMMANDS = {
     "clear": "Clear screen",
     "help": "Show help information",
     "model": "Show current model provider and name",
+    "mcp": "Show configured MCP servers",
     "quit": "Exit the CLI",
     "exit": "Exit the CLI",
 }

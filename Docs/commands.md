@@ -5,11 +5,15 @@
 - Rich コンソールによる一貫したフィードバック表示と、タイムアウトやエラー時の標準化されたメッセージ出力を担う。
 
 ## 機能別設計
-### `handle_command(command: str)`
+### `handle_command(command: str, assistant_id: str = "agent")`
 - 受け取った文字列から先頭の `/` を除去し、小文字化したトークンでスイッチング。
 - `quit/exit/q` は `'exit'` を呼び出し元へ返却し、`simple_cli` が即座にループを抜けられるようにする。
 - `clear` は Rich の `console.clear()` と ASCII バナー再描画を行い、会話履歴は維持したまま UI をリフレッシュ。
 - `help` は `.ui.show_interactive_help` へ委譲。
+- `model` は `.config.get_current_model_info()` を呼び出して現在のモデル設定を表示。
+- `mcp` は `.mcp_tools.get_mcp_server_info()` を呼び出してMCPサーバー設定を表示。
+  - `mcp.json`が存在しない場合は警告を表示。
+  - 各サーバーの名前、ステータス（有効/無効）、タイプ、接続情報を表示。
 - 未知コマンドは警告を表示した上で `True` を返し、呼び出し側に「処理済み」と認識させる。
 
 ### `execute_bash_command(command: str)`
@@ -18,8 +22,10 @@
 - `TimeoutExpired` やその他例外は明示的なエラーメッセージで通知し、CLI を継続可能に保つ。
 
 ## 依存要素
-- `.config` から `console`, `COLORS`, `DDAWORD_ASCII` を参照してビジュアルを統一。
+- `.config` から `console`, `COLORS`, `DDAWORD_ASCII`, `get_current_model_info` を参照してビジュアルを統一。
 - `.ui.show_interactive_help` に依存し、ヘルプ内容の一元管理を維持。
+- `.mcp_tools.get_mcp_server_info` に依存し、MCPサーバー情報の取得を委譲。
+- `.agent.AGENT_ROOT` を参照してエージェントディレクトリのパスを取得。
 
 ## エラー/セキュリティ配慮
 - `shell=True` を使用しているため、ユーザー入力がそのままシェルに渡る点を周知し、不要な自動整形を行わない。

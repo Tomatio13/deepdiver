@@ -25,6 +25,9 @@
 
 ### `main(assistant_id, session_state)`
 - `.config.create_model()` でモデル実体を（存在すれば）生成し、`DEFAULT_TOOLS` を `create_agent_with_config` に渡してエージェントを構築。
+- `.mcp_tools.load_mcp_tools()` で `mcp.json` からMCPサーバー設定を読み込み、MCPクライアントをツールリストに追加。
+- MCPクライアントは `ToolProvider` インターフェースを実装しているため、Strands Agentが自動的に初期化・管理する。
+- 一部のMCPサーバーが初期化に失敗しても、エージェント作成は継続され、利用可能なツールのみが登録される。
 - `simple_cli` を `await` し、例外が発生した際は Rich で整形したエラーメッセージを表示。
 
 ### `cli_main()`
@@ -33,8 +36,9 @@
 - Ctrl+C で中断された場合は整形済みのメッセージを出し、トレースバックを抑制。
 
 ## データフローと依存
-- `.commands`, `.config`, `.agent`, `.execution`, `.input`, `.ui` へ相互依存し、CLI 全体のオーケストレーターとして機能。
-- `DEFAULT_TOOLS` として `strands_tools` 由来のツールを束ね、`create_agent_with_config` に渡す唯一の呼び出し元となる。
+- `.commands`, `.config`, `.agent`, `.execution`, `.input`, `.ui`, `.mcp_tools` へ相互依存し、CLI 全体のオーケストレーターとして機能。
+- `DEFAULT_TOOLS` として `strands_tools` 由来のツールを束ね、`load_mcp_tools()` で取得したMCPクライアントと合わせて `create_agent_with_config` に渡す唯一の呼び出し元となる。
+- MCPツールは `~/.strands-agents-cli/<agent名>/mcp.json` から設定を読み込み、各MCPサーバーに対して `MCPClient` インスタンスを作成してツールリストに追加する。
 - `SessionState` は `simple_cli` と prompt_toolkit のトグルキー／ツールバーが共有する唯一の可変状態。
 
 ## エラーハンドリング指針
