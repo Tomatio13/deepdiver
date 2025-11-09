@@ -3,7 +3,7 @@
 import subprocess
 from pathlib import Path
 
-from .config import COLORS, DDAWORD_ASCII, console
+from .config import COLORS, DDAWORD_ASCII, console, get_current_model_info
 from .ui import show_interactive_help
 
 
@@ -28,6 +28,22 @@ def handle_command(command: str) -> str | bool:
 
     if cmd == "help":
         show_interactive_help()
+        return True
+
+    if cmd == "model":
+        model_info = get_current_model_info()
+        console.print()
+        if model_info["provider"]:
+            console.print("[bold]Current Model Configuration:[/bold]", style=COLORS["primary"])
+            console.print(f"  Provider: [bold]{model_info['provider']}[/bold]", style=COLORS["agent"])
+            if model_info["model_name"]:
+                console.print(f"  Model: [bold]{model_info['model_name']}[/bold]", style=COLORS["agent"])
+            else:
+                console.print("  Model: [dim](not specified, using provider defaults)[/dim]", style=COLORS["dim"])
+        else:
+            console.print("[yellow]No model provider configured.[/yellow]")
+            console.print("[dim]Set STRANDS_MODEL_PROVIDER environment variable to configure a model.[/dim]")
+        console.print()
         return True
 
     console.print()

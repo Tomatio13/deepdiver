@@ -22,7 +22,7 @@ def _ensure_agent_files(assistant_id: str) -> Path:
     agent_dir = _agent_dir(assistant_id)
     agent_dir.mkdir(parents=True, exist_ok=True)
 
-    agent_md = agent_dir / "agent.md"
+    agent_md = agent_dir / "AGENT.md"
     if not agent_md.exists():
         agent_md.write_text(get_default_coding_instructions())
 
@@ -48,7 +48,7 @@ def list_agents() -> None:
         if not agent_path.is_dir():
             continue
         agent_name = agent_path.name
-        agent_md = agent_path / "agent.md"
+        agent_md = agent_path / "AGENT.md"
 
         if agent_md.exists():
             console.print(f"  • [bold]{agent_name}[/bold]", style=COLORS["primary"])
@@ -68,7 +68,7 @@ def reset_agent(agent_name: str, source_agent: str | None = None) -> None:
 
     if source_agent:
         source_dir = _agent_dir(source_agent)
-        source_md = source_dir / "agent.md"
+        source_md = source_dir / "AGENT.md"
         if not source_md.exists():
             console.print(
                 f"[bold red]Error:[/bold red] Source agent '{source_agent}' not found or missing agent.md"
@@ -85,7 +85,7 @@ def reset_agent(agent_name: str, source_agent: str | None = None) -> None:
         console.print(f"Removed existing agent directory: {target_dir}", style=COLORS["tool"])
 
     target_dir.mkdir(parents=True, exist_ok=True)
-    (target_dir / "agent.md").write_text(new_prompt)
+    (target_dir / "AGENT.md").write_text(new_prompt)
     (target_dir / MEMORY_DIRNAME).mkdir(exist_ok=True)
 
     console.print(f"✓ Agent '{agent_name}' reset to {action_desc}", style=COLORS["primary"])
@@ -108,7 +108,7 @@ def _base_cli_prompt(agent_dir: Path) -> str:
 
 def _build_system_prompt(agent_dir: Path) -> str:
     base_prompt = _base_cli_prompt(agent_dir)
-    agent_md = (agent_dir / "agent.md").read_text().strip()
+    agent_md = (agent_dir / "AGENT.md").read_text().strip()
 
     if agent_md:
         return f"{base_prompt}\n\n<agent_memory>\n{agent_md}\n</agent_memory>"

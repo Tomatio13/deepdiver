@@ -21,7 +21,23 @@ COLORS = {
 }
 
 # ASCII art banner
+# DDAWORD_ASCII= """
+#  ███████╗ ██╗   ██╗      ██╗ ██╗ ████████╗ ███████╗ ██╗   ██╗
+#  ██╔════╝ ██║   ██║      ██║ ██║ ╚══██╔══╝ ██╔════╝ ██║   ██║
+#  █████╗   ██║   ██║      ██║ ██║    ██║    ███████╗ ██║   ██║
+#  ██╔══╝   ██║   ██║ ██   ██║ ██║    ██║    ╚════██║ ██║   ██║
+#  ██║      ╚██████╔╝ ╚█████╔╝ ██║    ██║    ███████║ ╚██████╔╝
+#  ╚═╝       ╚═════╝   ╚════╝  ╚═╝    ╚═╝    ╚══════╝  ╚═════╝ 
+
+#  ██╗ ███╗   ██╗ ███╗   ██╗  ██████╗  ██╗   ██╗  █████╗  ████████╗ ███████╗      █████╗  ██╗
+#  ██║ ████╗  ██║ ████╗  ██║ ██╔═══██╗ ██║   ██║ ██╔══██╗ ╚══██╔══╝ ██╔════╝     ██╔══██╗ ██║
+#  ██║ ██╔██╗ ██║ ██╔██╗ ██║ ██║   ██║ ██║   ██║ ███████║    ██║    █████╗       ███████║ ██║
+#  ██║ ██║╚██╗██║ ██║╚██╗██║ ██║   ██║ ╚██╗ ██╔╝ ██╔══██║    ██║    ██╔══╝       ██╔══██║ ██║
+#  ██║ ██║ ╚████║ ██║ ╚████║ ╚██████╔╝  ╚████╔╝  ██║  ██║    ██║    ███████╗ ██╗ ██║  ██║ ██║
+#  ╚═╝ ╚═╝  ╚═══╝ ╚═╝  ╚═══╝  ╚═════╝    ╚═══╝   ╚═╝  ╚═╝    ╚═╝    ╚══════╝ ╚═╝ ╚═╝  ╚═╝ ╚═╝
+# """
 DDAWORD_ASCII= """
+
  ███████╗ ██╗   ██╗      ██╗ ██╗ ████████╗ ███████╗ ██╗   ██╗
  ██╔════╝ ██║   ██║      ██║ ██║ ╚══██╔══╝ ██╔════╝ ██║   ██║
  █████╗   ██║   ██║      ██║ ██║    ██║    ███████╗ ██║   ██║
@@ -29,18 +45,19 @@ DDAWORD_ASCII= """
  ██║      ╚██████╔╝ ╚█████╔╝ ██║    ██║    ███████║ ╚██████╔╝
  ╚═╝       ╚═════╝   ╚════╝  ╚═╝    ╚═╝    ╚══════╝  ╚═════╝ 
 
- ██╗ ███╗   ██╗ ███╗   ██╗  ██████╗  ██╗   ██╗  █████╗  ████████╗ ███████╗      █████╗  ██╗
- ██║ ████╗  ██║ ████╗  ██║ ██╔═══██╗ ██║   ██║ ██╔══██╗ ╚══██╔══╝ ██╔════╝     ██╔══██╗ ██║
- ██║ ██╔██╗ ██║ ██╔██╗ ██║ ██║   ██║ ██║   ██║ ███████║    ██║    █████╗       ███████║ ██║
- ██║ ██║╚██╗██║ ██║╚██╗██║ ██║   ██║ ╚██╗ ██╔╝ ██╔══██║    ██║    ██╔══╝       ██╔══██║ ██║
- ██║ ██║ ╚████║ ██║ ╚████║ ╚██████╔╝  ╚████╔╝  ██║  ██║    ██║    ███████╗ ██╗ ██║  ██║ ██║
- ╚═╝ ╚═╝  ╚═══╝ ╚═╝  ╚═══╝  ╚═════╝    ╚═══╝   ╚═╝  ╚═╝    ╚═╝    ╚══════╝ ╚═╝ ╚═╝  ╚═╝ ╚═╝
+ ██████╗  ██████╗   █████╗  ██╗    ██╗  ██████╗  ██████╗  ██████╗ 
+ ██╔══██╗ ██╔══██╗ ██╔══██╗ ██║    ██║ ██╔═══██╗ ██╔══██╗ ██╔══██╗
+ ██║  ██║ ██║  ██║ ███████║ ██║ █╗ ██║ ██║   ██║ ██████╔╝ ██║  ██║
+ ██║  ██║ ██║  ██║ ██╔══██║ ██║███╗██║ ██║   ██║ ██╔══██╗ ██║  ██║
+ ██████╔╝ ██████╔╝ ██║  ██║ ╚███╔███╔╝ ╚██████╔╝ ██║  ██║ ██████╔╝
+ ╚═════╝  ╚═════╝  ╚═╝  ╚═╝  ╚══╝╚══╝   ╚═════╝  ╚═╝  ╚═╝ ╚═════╝ 
 """
 
 # Interactive commands
 COMMANDS = {
     "clear": "Clear screen",
     "help": "Show help information",
+    "model": "Show current model provider and name",
     "quit": "Exit the CLI",
     "exit": "Exit the CLI",
 }
@@ -131,6 +148,48 @@ def _sanitize_config_for_display(config: dict[str, Any]) -> dict[str, Any]:
         else:
             sanitised[key] = value
     return sanitised
+
+
+def get_current_model_info() -> dict[str, str | None]:
+    """Get current model provider and model name from environment configuration.
+    
+    Returns:
+        Dictionary with 'provider' and 'model_name' keys.
+    """
+    provider = os.environ.get("STRANDS_MODEL_PROVIDER")
+    if not provider:
+        return {"provider": None, "model_name": None}
+    
+    provider = provider.lower()
+    model_name = None
+    
+    if provider == "bedrock":
+        model_name = os.environ.get("BEDROCK_MODEL_ID") or os.environ.get("STRANDS_MODEL_ID")
+    elif provider == "openai":
+        model_name = os.environ.get("OPENAI_MODEL")
+    elif provider == "anthropic":
+        model_name = os.environ.get("ANTHROPIC_MODEL")
+    elif provider == "ollama":
+        # Ollama typically uses OLLAMA_MODEL or model config
+        model_name = os.environ.get("OLLAMA_MODEL")
+    
+    # Check STRANDS_MODEL_CONFIG for model name if not found above
+    if not model_name:
+        config_value = os.environ.get("STRANDS_MODEL_CONFIG")
+        if config_value:
+            try:
+                candidate_path = Path(config_value)
+                if candidate_path.exists():
+                    loaded = json.loads(candidate_path.read_text())
+                else:
+                    loaded = json.loads(config_value)
+                if isinstance(loaded, dict):
+                    # Check common model name keys
+                    model_name = loaded.get("model") or loaded.get("model_id") or loaded.get("model_name")
+            except (json.JSONDecodeError, Exception):
+                pass
+    
+    return {"provider": provider, "model_name": model_name}
 
 
 def create_model():

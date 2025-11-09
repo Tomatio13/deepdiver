@@ -54,7 +54,7 @@ def show_help() -> None:
         "  Agents are stored in: ~/.strands-agents-cli/AGENT_NAME/", style=COLORS["dim"]
     )
     console.print(
-        "  Each agent has an agent.md file and an optional memories/ directory",
+        "  Each agent has an AGENT.md file and an optional memories/ directory",
         style=COLORS["dim"],
     )
     console.print()
