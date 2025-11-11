@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from typing import Any, Iterable
 
 from rich.markdown import Markdown
@@ -55,43 +56,180 @@ def _stringify_response(response: Any) -> str:
 
 
 def _render_tool_event(event: dict) -> None:
-    tool_event = event.get("tool_stream_event")
-    if not isinstance(tool_event, dict):
-        return
-
-    data = tool_event.get("data")
-    if not data:
-        return
-
-    console.print(
-        Panel(
-            _stringify_response(data),
-            title="Tool Update",
-            border_style=COLORS["tool"],
+    if "current_tool_use" in event and event["current_tool_use"].get("name"):
+        tool_name = event["current_tool_use"]["name"]
+        data=_stringify_response(event["current_tool_use"])
+        console.print()
+        console.print(f"🔧 Using tool: {tool_name}")
+        console.print(
+            Panel(
+                _stringify_response(data),
+                title="Tool Update",
+                border_style=COLORS["tool"],
+            )
         )
-    )
-
+    # ツールイベント表示後も即座にフラッシュして、表示を遅延させない
+    sys.stdout.flush()
 
 def _render_model_delta(event: dict, buffer: list[str]) -> bool:
     """Render model delta and return True if content was rendered."""
-    model_event = event.get("model_stream_event")
-    if not isinstance(model_event, dict):
-        return False
-
-    delta = model_event.get("delta") or model_event.get("output_text")
-    if not isinstance(delta, str) or not delta:
-        return False
-
-    buffer.append(delta)
-    console.print(delta, style=COLORS["agent"], end="")
-    return True
+    # Strands Agentのドキュメントによると、テキストチャンクは 'data' フィールドに直接ある
+    # 'delta' も存在するが、'data' が推奨される
+    data = event.get("data")
+    if isinstance(data, str) and data:
+        buffer.append(data)
+        console.print(data, style=COLORS["agent"], end="")
+        #console.print(Markdown(data.replace("\n", "")), style=COLORS["agent"],end="")
+        # ストリーミング時のリアルタイム表示を改善するため、出力を即座にフラッシュ
+        sys.stdout.flush()
+        return True
+    
+    # 後方互換性のため、delta もチェック
+    delta = event.get("delta")
+    if isinstance(delta, str) and delta:
+        buffer.append(delta)
+        console.print(delta, style=COLORS["tool"], end="")
+        #console.print(Markdown(delta), style=COLORS["agent"],end="")
+        sys.stdout.flush()
+        return True
+    
+    return False
 
 
 def _extract_final_response(event: dict) -> str:
+    """Extract final response from event."""
+    # Strands Agentのドキュメントによると、最終結果は 'result' フィールドにある
+    result = event.get("result")
+    if result is not None:
+        # AgentResultオブジェクトの場合、output_textやcontentを取得
+        if hasattr(result, "output_text"):
+            return str(result.output_text)
+        if hasattr(result, "content"):
+            return _stringify_response(result.content)
+        if isinstance(result, dict):
+            return _stringify_response(result)
+        return _stringify_response(result)
+    
+    # 後方互換性のため、assistant_response もチェック
     assistant_event = event.get("assistant_response")
     if isinstance(assistant_event, dict):
         return _stringify_response(assistant_event)
     return ""
+
+def _render_lifecycle_event(event: dict, debug_mode: bool = False) -> None:
+    """Render lifecycle events (for debugging).
+    
+    Args:
+        event: Event dictionary from agent stream
+        debug_mode: Enable debug output for lifecycle events
+    """
+    if not debug_mode:
+        return
+    
+    # Track event loop lifecycle
+    if event.get("init_event_loop", False):
+        console.print("[dim]🔄 Event loop initialized[/dim]")
+    elif event.get("start_event_loop", False):
+        console.print("[dim]▶️ Event loop cycle starting[/dim]")
+    elif "message" in event:
+        role = event["message"].get("role", "unknown")
+        console.print(f"[dim]📬 New message created: {role}[/dim]")
+    elif event.get("complete", False):
+        console.print("[dim]✅ Cycle completed[/dim]")
+    elif event.get("force_stop", False):
+        reason = event.get("force_stop_reason", "unknown reason")
+        console.print(f"[yellow]🛑 Event loop force-stopped: {reason}[/yellow]")
+        sys.stdout.flush()
+
+
+def _render_tool_stream_event(event: dict) -> None:
+    """Render tool streaming event.
+    
+    Args:
+        event: Event dictionary from agent stream
+    """
+    tool_stream_event = event.get("tool_stream_event")
+    if not tool_stream_event:
+        return
+    
+    tool_use = tool_stream_event.get("tool_use", {})
+    tool_name = tool_use.get("name", "unknown")
+    data = tool_stream_event.get("data")
+    
+    if data:
+        # ツールからのストリーミングデータを表示
+        console.print(
+            f"[dim]🔧 Tool '{tool_name}' streaming: {data}[/dim]",
+            end=""
+        )
+        sys.stdout.flush()
+
+async def _stream_agent(agent: Any, prompt: str, debug_mode: bool = False) -> str | None:
+    """Stream agent response and render events in real-time.
+    
+    This function implements the async iterator pattern for streaming agent events,
+    following Strands Agents best practices.
+    
+    Args:
+        agent: Strands Agent instance
+        prompt: User prompt
+        debug_mode: Enable debug output for lifecycle events
+    
+    Returns:
+        Final response text, or None if no response was generated
+    """
+    response_buffer: list[str] = []
+    final_response = ""
+    
+    try:
+        async for event in agent.stream_async(prompt):
+            if not isinstance(event, dict):
+                continue
+
+            # 強制停止イベントのチェック
+            if event.get("force_stop", False):
+                reason = event.get("force_stop_reason", "unknown reason")
+                console.print(
+                    f"\n[yellow]⚠️ Stream force-stopped: {reason}[/yellow]"
+                )
+
+            # ライフサイクルイベントの表示（デバッグモードのみ）
+            # _render_lifecycle_event(event, debug_mode)
+
+            # ツールイベントの表示
+            #_render_tool_event(event)
+            
+            # ツールストリーミングイベントの表示
+            _render_tool_stream_event(event)
+            
+            # モデルデルタをレンダリング（リアルタイム表示）
+            _render_model_delta(event, response_buffer)
+
+            # 最終結果の取得
+            # 注意: resultイベントは複数回発生する可能性があるため、
+            # 最新のものを保持する
+            if "result" in event:
+                candidate = _extract_final_response(event)
+                if candidate:
+                    final_response = candidate
+            
+        # 最終結果があればそれを使用、なければバッファから構築
+        # 注意: resultイベントのoutput_textにはストリーミングされた全テキストが含まれるため、
+        # 通常はfinal_responseを使用する
+        combined = final_response or "".join(response_buffer)
+        return combined.strip() or None
+            
+    except KeyboardInterrupt:
+        # Ctrl+Cで中断された場合
+        console.print("\n[yellow]Stream interrupted by user[/yellow]")
+        combined = final_response or "".join(response_buffer)
+        return combined.strip() or None
+    except Exception as exc:  # noqa: BLE001 - fall back to non-streaming
+        # エラー時はステータス表示をクリアしてからメッセージを表示
+        console.print(
+            f"\n[yellow]Streaming unavailable, falling back to blocking call ({exc}).[/yellow]"
+        )
+        return await _invoke_agent(agent, prompt)
 
 
 async def _invoke_agent(agent: Any, prompt: str) -> str:
@@ -103,34 +241,6 @@ async def _invoke_agent(agent: Any, prompt: str) -> str:
     loop = asyncio.get_running_loop()
     response = await loop.run_in_executor(None, lambda: agent(prompt))
     return _stringify_response(response)
-
-
-async def _stream_agent(agent: Any, prompt: str) -> str | None:
-    response_buffer: list[str] = []
-    final_response = ""
-    # ステータス表示中はconsole.print()を呼び出さない（ツールイベントやモデルデルタの表示は必要）
-    try:
-        async for event in agent.stream_async(prompt):
-            if not isinstance(event, dict):
-                continue
-
-            _render_tool_event(event)
-            # モデルデルタをレンダリング（リアルタイム表示）
-            _render_model_delta(event, response_buffer)
-
-            candidate = _extract_final_response(event)
-            if candidate:
-                final_response = candidate
-
-        combined = final_response or "".join(response_buffer)
-        return combined.strip() or None
-    except Exception as exc:  # noqa: BLE001 - fall back to non-streaming
-        # エラー時はステータス表示をクリアしてからメッセージを表示
-        console.print(
-            f"\n[yellow]Streaming unavailable, falling back to blocking call ({exc}).[/yellow]"
-        )
-        return await _invoke_agent(agent, prompt)
-
 
 async def execute_task(
     user_input: str,

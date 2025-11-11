@@ -134,6 +134,7 @@ def create_agent_with_config(model: Any | None, assistant_id: str, tools: Sequen
     agent_kwargs: dict[str, Any] = {
         "system_prompt": system_prompt,
         "tools": list(tools),
+        "callback_handler": None,
     }
     if model is not None:
         agent_kwargs["model"] = model

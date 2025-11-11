@@ -68,7 +68,7 @@ COMMANDS = {
 MAX_ARG_LENGTH = 150
 
 # Rich console instance
-console = Console(highlight=False)
+console = Console(highlight=False, force_terminal=True)
 
 
 class SessionState:
