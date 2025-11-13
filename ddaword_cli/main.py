@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -126,7 +127,8 @@ async def simple_cli(agent, assistant_id: str | None, session_state):
         except KeyboardInterrupt:
             # Ctrl+C at prompt - exit the program
             console.print("\nGoodbye!", style=COLORS["primary"])
-            break
+            # Force immediate exit without waiting for cleanup
+            os._exit(0)
 
         if not user_input:
             continue
@@ -136,7 +138,8 @@ async def simple_cli(agent, assistant_id: str | None, session_state):
             result = handle_command(user_input, assistant_id)
             if result == "exit":
                 console.print("\nGoodbye!", style=COLORS["primary"])
-                break
+                # Force immediate exit without waiting for cleanup
+                os._exit(0)
             if result:
                 # Command was handled, continue to next input
                 continue
@@ -149,7 +152,8 @@ async def simple_cli(agent, assistant_id: str | None, session_state):
         # Handle regular quit keywords
         if user_input.lower() in ["quit", "exit", "q"]:
             console.print("\nGoodbye!", style=COLORS["primary"])
-            break
+            # Force immediate exit without waiting for cleanup
+            os._exit(0)
 
         await execute_task(user_input, agent, assistant_id, session_state)
 
@@ -173,6 +177,7 @@ async def main(assistant_id: str, session_state):
 
     # Create agent - MCP clients will initialize during agent creation
     # If some MCP servers fail to initialize, they will be skipped automatically
+    agent = None
     try:
         agent = create_agent_with_config(model, assistant_id, tools)
     except (ValueError, Exception) as e:
