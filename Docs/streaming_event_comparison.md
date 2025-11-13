@@ -129,3 +129,4 @@ if "result" in event:
 3. **終了判定**: `result`イベントが来たら最終結果を確定（ただし、ループは継続）
 4. **ライフサイクルイベント**: 必要に応じて`init_event_loop`、`start_event_loop`、`force_stop`などを処理
 
+

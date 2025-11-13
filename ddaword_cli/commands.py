@@ -11,12 +11,13 @@ from .ui import show_interactive_help
 
 def handle_command(command: str, assistant_id: str = "agent") -> str | bool:
     """Handle slash commands. Returns 'exit' to exit, True if handled, False to pass to agent."""
-    cmd = command.lower().strip().lstrip("/")
+    stripped_command = command.strip().lstrip("/")
+    cmd_lower = stripped_command.lower()
 
-    if cmd in ["quit", "exit", "q"]:
+    if cmd_lower in ["quit", "exit", "q"]:
         return "exit"
 
-    if cmd == "clear":
+    if cmd_lower == "clear":
         # Clear screen and show fresh UI
         console.clear()
         console.print(DDAWORD_ASCII, style=f"bold {COLORS['primary']}")
@@ -28,11 +29,11 @@ def handle_command(command: str, assistant_id: str = "agent") -> str | bool:
         console.print()
         return True
 
-    if cmd == "help":
+    if cmd_lower == "help":
         show_interactive_help()
         return True
 
-    if cmd == "model":
+    if cmd_lower == "model":
         model_info = get_current_model_info()
         console.print()
         if model_info["provider"]:
@@ -48,7 +49,7 @@ def handle_command(command: str, assistant_id: str = "agent") -> str | bool:
         console.print()
         return True
 
-    if cmd == "mcp":
+    if cmd_lower == "mcp":
         # Show MCP server information
         console.print()
         console.print("[bold]MCP Servers Configuration[/bold]", style=COLORS["primary"])
@@ -86,8 +87,12 @@ def handle_command(command: str, assistant_id: str = "agent") -> str | bool:
         console.print()
         return True
 
+    if cmd_lower.startswith("consulting:"):
+        from .consulting_commands import handle_consulting_command
+        return handle_consulting_command(stripped_command, assistant_id)
+
     console.print()
-    console.print(f"[yellow]Unknown command: /{cmd}[/yellow]")
+    console.print(f"[yellow]Unknown command: /{cmd_lower}[/yellow]")
     console.print("[dim]Type /help for available commands.[/dim]")
     console.print()
     return True

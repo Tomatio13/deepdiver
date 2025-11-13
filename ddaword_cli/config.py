@@ -63,6 +63,19 @@ COMMANDS = {
     "exit": "Exit the CLI",
 }
 
+# Consulting subcommands
+CONSULTING_COMMANDS = {
+    "init": "分析を初期化し、作業ディレクトリを作成",
+    "hypothesis": "仮説を生成 <project_name>",
+    "process-data": "データを整理・加工 <project_name>",
+    "validate": "仮説を検証 <project_name>",
+    "strategy": "戦略を立案 <project_name>",
+    "report": "レポートを生成 <project_name>",
+    "status": "現在の状態を表示 [project_name]",
+    "approve": "現在のステップを承認 <project_name>",
+    "reject": "現在のステップを否決 <project_name>",
+}
+
 
 # Maximum argument length for display
 MAX_ARG_LENGTH = 150
@@ -314,7 +327,7 @@ def create_model():
         return None
 
     sanitised = _sanitize_config_for_display(model_config)
-    console.print(
-        f"[dim]Using provider '{provider}' with config: {sanitised}[/dim]"
-    )
+    # console.print(
+    #     f"[dim]Using provider '{provider}' with config: {sanitised}[/dim]"
+    # )
     return model

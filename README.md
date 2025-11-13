@@ -40,6 +40,54 @@ export STRANDS_MODEL_CONFIG='{"model_id": "anthropic.claude-3-5-sonnet-20241022-
 
 `STRANDS_MODEL_PROVIDER` を指定しない場合は、Strands Agent 側のデフォルト設定が利用されます。
 
+## Consulting ワークフロー
+
+本 CLI には、売上・人事など複数の CSV を読み込み経営課題を抽出するコンサルティング用エージェントが同梱されています。操作は `/consulting:*` スラッシュコマンドで行います。
+
+### 1. 初期化
+
+```bash
+/consulting:init "<analysis_focus>" <csv_path1> [csv_path2] ...
+```
+
+- `analysis_focus` をもとに、**英小文字のみ / 数字なし / `単語_単語` 形式 (最大24文字)** の `project_name` が自動生成されます。
+- ファイルだけでなくフォルダ指定も可能（再帰的に `.csv` を収集）。
+- プロジェクトごとに `.consulting/<project_name>/` 以下へ状態 (`consulting.json`) と成果物 Markdown を保存します。
+
+### 2. ワークフローの流れ
+
+| ステップ | コマンド例 | 内容 |
+| --- | --- | --- |
+| 仮説立案 | `/consulting:hypothesis <project_name>` | CSV を横断し経営課題の仮説を生成 |
+| データ加工 | `/consulting:process-data <project_name>` | 仮説検証に必要な指標を抽出・加工 |
+| 仮説検証 | `/consulting:validate <project_name>` | 仮説をデータで検証し結論を出力 |
+| 戦略立案 | `/consulting:strategy <project_name>` | 検証済み課題に対する施策を提案 |
+| レポート生成 | `/consulting:report <project_name>` | 全成果を統合した最終レポートを作成 |
+
+各ステップ完了後は `/consulting:approve <project_name>` で承認、もしくは `/consulting:reject <project_name>` で否決します。否決時には CLI が理由入力を求め、内容は `feedback` として保存され次回のプロンプトに反映されます。否決ステップに応じてワークフローが適切な位置まで巻き戻ります（例: レポート否決→戦略ステップに戻る）。
+
+### 3. 状態確認
+
+```bash
+/consulting:status [project_name]
+```
+
+- 現在の状態・成果物・フィードバック履歴を表示します。
+- 状況に応じて推奨される次のコマンド（例: `/consulting:hypothesis <project_name>`）が案内されます。
+- `project_name` を省略すると最新のプロジェクトが対象です。
+
+### 4. 成果物
+
+プロジェクトディレクトリには下記 Markdown が生成されます。
+
+- `hypotheses.md` – 仮説一覧
+- `processed_data.md` – 検証用データの加工結果
+- `validation_results.md` – 仮説検証レポート
+- `strategies.md` – 戦略提案
+- `report.md` – 最終レポート
+
+必要に応じてエディタで内容を確認し、承認／否決を繰り返してブラッシュアップしてください。
+
 ## モデル設定の詳細
 
 `ddaword_cli/config.py` では `STRANDS_MODEL_PROVIDER` をもとに Strands の各モデルクラス（`BedrockModel` / `OpenAIModel` / `AnthropicModel` / `OllamaModel` / `GeminiModel`）を動的に生成します。主な環境変数は次の通りです。
