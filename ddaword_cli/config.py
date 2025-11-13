@@ -94,11 +94,11 @@ def get_default_coding_instructions() -> str:
 
 
 MODEL_CLASS_BY_PROVIDER = {
-    "bedrock": "BedrockModel",
-    "openai": "OpenAIModel",
-    "anthropic": "AnthropicModel",
-    "ollama": "OllamaModel",
-    "gemini": "GeminiModel",
+    "bedrock": ("strands.models.bedrock", "BedrockModel"),
+    "openai": ("strands.models.openai", "OpenAIModel"),
+    "anthropic": ("strands.models.anthropic", "AnthropicModel"),
+    "ollama": ("strands.models.ollama", "OllamaModel"),
+    "gemini": ("strands.models.gemini", "GeminiModel"),
 }
 
 SENSITIVE_KEYS = {"api_key", "secret", "token", "access_key"}
@@ -247,19 +247,20 @@ def create_model():
         return None
 
     provider = provider.lower()
-    class_name = MODEL_CLASS_BY_PROVIDER.get(provider)
-    if not class_name:
+    model_info = MODEL_CLASS_BY_PROVIDER.get(provider)
+    if not model_info:
         console.print(f"[yellow]Unknown STRANDS_MODEL_PROVIDER '{provider}'.[/yellow]")
         return None
 
+    module_path, class_name = model_info
     config_value = os.environ.get("STRANDS_MODEL_CONFIG")
     model_config = _load_model_config(config_value, provider)
 
     try:
-        module = __import__("strands", fromlist=[class_name])
+        module = __import__(module_path, fromlist=[class_name])
         model_cls = getattr(module, class_name)
     except (ImportError, AttributeError) as exc:
-        console.print(f"[red]Failed to load {class_name}: {exc}[/red]")
+        console.print(f"[red]Failed to load {class_name} from {module_path}: {exc}[/red]")
         return None
 
     try:

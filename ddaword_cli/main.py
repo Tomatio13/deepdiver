@@ -10,12 +10,13 @@ from strands_tools import editor, environment, file_read, file_write, http_reque
 from .agent import create_agent_with_config, list_agents, reset_agent
 from .commands import execute_bash_command, handle_command
 from .config import COLORS, DDAWORD_ASCII, SessionState, console, create_model
+from .csv_tool import filter_csv_data
 from .execution import execute_task
 from .input import create_prompt_session
 from .mcp_tools import load_mcp_tools
 from .ui import show_help
 
-DEFAULT_TOOLS = [file_read, file_write, editor, shell, http_request, environment,calculator,current_time]
+DEFAULT_TOOLS = [file_read, file_write, editor, shell, http_request, environment,calculator,current_time, filter_csv_data]
 
 
 def check_cli_dependencies():
