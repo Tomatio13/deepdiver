@@ -6,6 +6,8 @@ import asyncio
 import sys
 from typing import Any, Iterable
 
+from prompt_toolkit import PromptSession
+from prompt_toolkit.key_binding import KeyBindings
 from rich.markdown import Markdown
 from rich.panel import Panel
 
@@ -164,7 +166,85 @@ def _render_tool_stream_event(event: dict) -> None:
         )
         sys.stdout.flush()
 
-async def _stream_agent(agent: Any, prompt: str, debug_mode: bool = False) -> str | None:
+def _ask_tool_approval_sync(tool_name: str, tool_data: dict) -> bool:
+    """Ask user for approval before executing a tool (synchronous version).
+    
+    Args:
+        tool_name: Name of the tool to be executed
+        tool_data: Tool execution data/arguments
+        
+    Returns:
+        True if approved, False if rejected
+    """
+    console.print()
+    console.print(f"[yellow]🔧 Tool execution requested: {tool_name}[/yellow]")
+    # console.print(
+    #     Panel(
+    #         _stringify_response(tool_data),
+    #         title="Tool Arguments",
+    #         border_style=COLORS["tool"],
+    #     )
+    # )
+    
+    # Use simple input() for synchronous confirmation
+    # This is needed because callback handlers are synchronous
+    try:
+        response = input("Execute this tool? (y/n): ").strip().lower()
+        return response == "y"
+    except (EOFError, KeyboardInterrupt):
+        return False
+
+
+async def _ask_tool_approval_async(tool_name: str, tool_data: dict) -> bool:
+    """Ask user for approval before executing a tool (asynchronous version).
+    
+    Args:
+        tool_name: Name of the tool to be executed
+        tool_data: Tool execution data/arguments
+        
+    Returns:
+        True if approved, False if rejected
+    """
+    console.print()
+    console.print(f"[yellow]🔧 Tool execution requested: {tool_name}[/yellow]")
+    # console.print(
+    #     Panel(
+    #         _stringify_response(tool_data),
+    #         title="Tool Arguments",
+    #         border_style=COLORS["tool"],
+    #     )
+    # )
+    
+    # Create a simple prompt session for yes/no input
+    kb = KeyBindings()
+    
+    @kb.add("y")
+    @kb.add("Y")
+    def accept(event):
+        event.current_buffer.text = "y"
+        event.current_buffer.validate_and_handle()
+    
+    @kb.add("n")
+    @kb.add("N")
+    def reject(event):
+        event.current_buffer.text = "n"
+        event.current_buffer.validate_and_handle()
+    
+    session = PromptSession(
+        message="Execute this tool? (y/n): ",
+        key_bindings=kb,
+    )
+    
+    try:
+        response = await session.prompt_async()
+        return response.strip().lower() == "y"
+    except (EOFError, KeyboardInterrupt):
+        return False
+
+
+async def _stream_agent(
+    agent: Any, prompt: str, session_state=None, debug_mode: bool = False
+) -> str | None:
     """Stream agent response and render events in real-time.
     
     This function implements the async iterator pattern for streaming agent events,
@@ -173,6 +253,7 @@ async def _stream_agent(agent: Any, prompt: str, debug_mode: bool = False) -> st
     Args:
         agent: Strands Agent instance
         prompt: User prompt
+        session_state: Session state with auto_approve flag
         debug_mode: Enable debug output for lifecycle events
     
     Returns:
@@ -180,8 +261,50 @@ async def _stream_agent(agent: Any, prompt: str, debug_mode: bool = False) -> st
     """
     response_buffer: list[str] = []
     final_response = ""
+    # 確認済みのツール実行IDを追跡（重複確認を防ぐ）
+    approved_tool_use_ids: set[str] = set()
     
     try:
+        # コールバックハンドラーを設定（エージェントがサポートしている場合）
+        original_callback = getattr(agent, "callback_handler", None)
+        if hasattr(agent, "callback_handler") and session_state:
+            # 既存のコールバックハンドラーと統合
+            def combined_callback(**kwargs):
+                # ツール実行確認
+                if "current_tool_use" in kwargs:
+                    tool_use = kwargs["current_tool_use"]
+                    tool_name = tool_use.get("name")
+                    tool_use_id = tool_use.get("toolUseId")
+                    
+                    # 同じtoolUseIdで既に確認済みの場合はスキップ
+                    if tool_use_id and tool_use_id in approved_tool_use_ids:
+                        # 既に確認済みなので、元のコールバックのみ呼び出す
+                        if original_callback:
+                            original_callback(**kwargs)
+                        return
+                    
+                    if tool_name and not session_state.auto_approve:
+                        # 同期的に確認を求める（コールバックハンドラーは同期的）
+                        approved = _ask_tool_approval_sync(tool_name, tool_use)
+                        if approved and tool_use_id:
+                            # 確認済みとして記録
+                            approved_tool_use_ids.add(tool_use_id)
+                        if not approved:
+                            console.print("[red]Tool execution rejected by user[/red]")
+                            # 注意: Strands Agentのコールバックハンドラーでは、
+                            # ツール実行を完全にブロックすることはできない可能性があります
+                            # この実装は警告表示のみです
+                    elif tool_name and session_state.auto_approve:
+                        # auto_approveがONの場合は、確認済みとして記録
+                        if tool_use_id:
+                            approved_tool_use_ids.add(tool_use_id)
+                
+                # 元のコールバックハンドラーを呼び出す
+                if original_callback:
+                    original_callback(**kwargs)
+            
+            agent.callback_handler = combined_callback
+        
         async for event in agent.stream_async(prompt):
             if not isinstance(event, dict):
                 continue
@@ -256,7 +379,7 @@ async def execute_task(
     # メッセージの最後に\nを追加して、ステータス終了後に改行が入るようにする
 
     if hasattr(agent, "stream_async"):
-        response_text = await _stream_agent(agent, final_input)
+        response_text = await _stream_agent(agent, final_input, session_state)
         # ストリーミング中に既に内容が表示されているため、改行のみ追加
         console.print()
     else:
