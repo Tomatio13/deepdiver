@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from collections.abc import Callable
 from typing import Any, Iterable
 
 from prompt_toolkit import PromptSession
@@ -73,12 +74,15 @@ def _render_tool_event(event: dict) -> None:
     # ツールイベント表示後も即座にフラッシュして、表示を遅延させない
     sys.stdout.flush()
 
-def _render_model_delta(event: dict, buffer: list[str]) -> bool:
+def _render_model_delta(event: dict, buffer: list[str], session_state=None) -> bool:
     """Render model delta and return True if content was rendered."""
     # Strands Agentのドキュメントによると、テキストチャンクは 'data' フィールドに直接ある
     # 'delta' も存在するが、'data' が推奨される
     data = event.get("data")
     if isinstance(data, str) and data:
+        # テキストがストリーミングされ始めたら、ステータスを即座に停止
+        if session_state:
+            session_state.clear_status()
         buffer.append(data)
         console.print(data, style=COLORS["agent"], end="")
         #console.print(Markdown(data.replace("\n", "")), style=COLORS["agent"],end="")
@@ -89,6 +93,9 @@ def _render_model_delta(event: dict, buffer: list[str]) -> bool:
     # 後方互換性のため、delta もチェック
     delta = event.get("delta")
     if isinstance(delta, str) and delta:
+        # テキストがストリーミングされ始めたら、ステータスを即座に停止
+        if session_state:
+            session_state.clear_status()
         buffer.append(delta)
         console.print(delta, style=COLORS["tool"], end="")
         #console.print(Markdown(delta), style=COLORS["agent"],end="")
@@ -242,6 +249,109 @@ async def _ask_tool_approval_async(tool_name: str, tool_data: dict) -> bool:
         return False
 
 
+def _handle_tool_use(
+    tool_use: dict,
+    session_state,
+    approved_tool_use_ids: set[str],
+) -> None:
+    """Handle tool use event in callback handler.
+    
+    Args:
+        tool_use: Tool use dictionary containing tool name and ID
+        session_state: Session state for status management
+        approved_tool_use_ids: Set of approved tool use IDs
+    """
+    tool_name = tool_use.get("name")
+    tool_use_id = tool_use.get("toolUseId")
+    
+    # ツール実行開始時: ステータス表示を開始
+    if tool_name:
+        session_state.set_thinking_status(None)  # 思考ステータスをクリア
+        session_state.set_tool_status(f"Tool executing: {tool_name}...")
+    
+    if tool_name and not session_state.auto_approve:
+        # 同期的に確認を求める（コールバックハンドラーは同期的）
+        # 確認中はステータスを一時停止
+        session_state.set_tool_status(None)
+        approved = _ask_tool_approval_sync(tool_name, tool_use)
+        if approved and tool_use_id:
+            # 確認済みとして記録
+            approved_tool_use_ids.add(tool_use_id)
+            # ツール実行再開時にステータスを再開
+            session_state.set_tool_status(f"Tool executing: {tool_name}...")
+        else:
+            if not approved:
+                console.print("[red]Tool execution rejected by user[/red]")
+            # ツール実行が拒否された場合はステータスを停止
+            session_state.set_tool_status(None)
+            # 注意: Strands Agentのコールバックハンドラーでは、
+            # ツール実行を完全にブロックすることはできない可能性があります
+            # この実装は警告表示のみです
+    elif tool_name and session_state.auto_approve:
+        # auto_approveがONの場合は、確認済みとして記録
+        if tool_use_id:
+            approved_tool_use_ids.add(tool_use_id)
+
+
+def _handle_tool_complete(session_state) -> None:
+    """Handle tool completion event in callback handler.
+    
+    Args:
+        session_state: Session state for status management
+    """
+    # ツール実行完了時: ステータス表示を停止して思考ステータスに切り替え
+    session_state.set_tool_status(None)
+    session_state.set_thinking_status("Thinking...")
+
+
+def create_combined_callback(
+    session_state,
+    approved_tool_use_ids: set[str],
+    original_callback: Callable | None,
+) -> Callable:
+    """Create a combined callback handler for agent tool execution.
+    
+    Args:
+        session_state: Session state for status management
+        approved_tool_use_ids: Set of approved tool use IDs
+        original_callback: Original callback handler to wrap
+        
+    Returns:
+        Combined callback function
+    """
+    def combined_callback(**kwargs):
+        """Combined callback handler that manages tool execution and status display."""
+        # ツール実行確認
+        if "current_tool_use" in kwargs:
+            tool_use = kwargs["current_tool_use"]
+            tool_use_id = tool_use.get("toolUseId")
+            
+            # 同じtoolUseIdで既に確認済みの場合はスキップ
+            if tool_use_id and tool_use_id in approved_tool_use_ids:
+                # 既に確認済みなので、元のコールバックのみ呼び出す
+                if original_callback:
+                    original_callback(**kwargs)
+                return
+            
+            # ツール実行処理
+            _handle_tool_use(
+                tool_use,
+                session_state,
+                approved_tool_use_ids,
+            )
+        
+        # AI思考中（ツール実行以外の処理中）の検出
+        # イベントストリームで検出するため、ここではツール実行終了時の処理のみ
+        if "tool_result" in kwargs or "tool_complete" in kwargs:
+            _handle_tool_complete(session_state)
+        
+        # 元のコールバックハンドラーを呼び出す
+        if original_callback:
+            original_callback(**kwargs)
+    
+    return combined_callback
+
+
 async def _stream_agent(
     agent: Any, prompt: str, session_state=None, debug_mode: bool = False
 ) -> str | None:
@@ -269,41 +379,16 @@ async def _stream_agent(
         original_callback = getattr(agent, "callback_handler", None)
         if hasattr(agent, "callback_handler") and session_state:
             # 既存のコールバックハンドラーと統合
-            def combined_callback(**kwargs):
-                # ツール実行確認
-                if "current_tool_use" in kwargs:
-                    tool_use = kwargs["current_tool_use"]
-                    tool_name = tool_use.get("name")
-                    tool_use_id = tool_use.get("toolUseId")
-                    
-                    # 同じtoolUseIdで既に確認済みの場合はスキップ
-                    if tool_use_id and tool_use_id in approved_tool_use_ids:
-                        # 既に確認済みなので、元のコールバックのみ呼び出す
-                        if original_callback:
-                            original_callback(**kwargs)
-                        return
-                    
-                    if tool_name and not session_state.auto_approve:
-                        # 同期的に確認を求める（コールバックハンドラーは同期的）
-                        approved = _ask_tool_approval_sync(tool_name, tool_use)
-                        if approved and tool_use_id:
-                            # 確認済みとして記録
-                            approved_tool_use_ids.add(tool_use_id)
-                        if not approved:
-                            console.print("[red]Tool execution rejected by user[/red]")
-                            # 注意: Strands Agentのコールバックハンドラーでは、
-                            # ツール実行を完全にブロックすることはできない可能性があります
-                            # この実装は警告表示のみです
-                    elif tool_name and session_state.auto_approve:
-                        # auto_approveがONの場合は、確認済みとして記録
-                        if tool_use_id:
-                            approved_tool_use_ids.add(tool_use_id)
-                
-                # 元のコールバックハンドラーを呼び出す
-                if original_callback:
-                    original_callback(**kwargs)
-            
+            combined_callback = create_combined_callback(
+                session_state,
+                approved_tool_use_ids,
+                original_callback,
+            )
             agent.callback_handler = combined_callback
+        
+        # ストリーミング開始時: AI思考中のステータスを開始
+        if session_state:
+            session_state.set_thinking_status("AI Thinking...")
         
         async for event in agent.stream_async(prompt):
             if not isinstance(event, dict):
@@ -326,7 +411,9 @@ async def _stream_agent(
             _render_tool_stream_event(event)
             
             # モデルデルタをレンダリング（リアルタイム表示）
-            _render_model_delta(event, response_buffer)
+            # テキストがストリーミングされている場合は、思考中のステータスを停止
+            # 注意: _render_model_delta内で既にステータスを停止している
+            _render_model_delta(event, response_buffer, session_state)
 
             # 最終結果の取得
             # 注意: resultイベントは複数回発生する可能性があるため、
@@ -335,20 +422,30 @@ async def _stream_agent(
                 candidate = _extract_final_response(event)
                 if candidate:
                     final_response = candidate
+                    # 最終結果が取得されたらステータスを停止
+                    if session_state:
+                        session_state.clear_status()
             
         # 最終結果があればそれを使用、なければバッファから構築
         # 注意: resultイベントのoutput_textにはストリーミングされた全テキストが含まれるため、
         # 通常はfinal_responseを使用する
+        # ステータス表示を停止
+        if session_state:
+            session_state.clear_status()
         combined = final_response or "".join(response_buffer)
         return combined.strip() or None
             
     except KeyboardInterrupt:
         # Ctrl+Cで中断された場合
+        if session_state:
+            session_state.clear_status()
         console.print("\n[yellow]Stream interrupted by user[/yellow]")
         combined = final_response or "".join(response_buffer)
         return combined.strip() or None
     except Exception as exc:  # noqa: BLE001 - fall back to non-streaming
         # エラー時はステータス表示をクリアしてからメッセージを表示
+        if session_state:
+            session_state.clear_status()
         console.print(
             f"\n[yellow]Streaming unavailable, falling back to blocking call ({exc}).[/yellow]"
         )

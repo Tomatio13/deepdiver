@@ -127,7 +127,7 @@ def parse_file_mentions(text: str) -> tuple[str, list[Path]]:
 def get_bottom_toolbar(
     session_state: SessionState, session_ref: dict
 ) -> Callable[[], list[tuple[str, str]]]:
-    """Return toolbar function that shows auto-approve status and BASH MODE."""
+    """Return toolbar function that shows auto-approve status, BASH MODE, and AI status."""
 
     def toolbar() -> list[tuple[str, str]]:
         parts = []

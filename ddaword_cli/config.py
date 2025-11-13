@@ -76,11 +76,55 @@ class SessionState:
 
     def __init__(self, auto_approve: bool = False):
         self.auto_approve = auto_approve
+        self.thinking_status: str | None = None  # "AI Thinking..." など
+        self.tool_status: str | None = None  # "Tool executing: {name}..." など
+        self._status_obj = None  # rich.status.Status オブジェクト
 
     def toggle_auto_approve(self) -> bool:
         """Toggle auto-approve and return new state."""
         self.auto_approve = not self.auto_approve
         return self.auto_approve
+    
+    def set_thinking_status(self, message: str | None) -> None:
+        """Set thinking status message."""
+        self.thinking_status = message
+        self._update_status_display()
+    
+    def set_tool_status(self, message: str | None) -> None:
+        """Set tool execution status message."""
+        self.tool_status = message
+        self._update_status_display()
+    
+    def _update_status_display(self) -> None:
+        """Update the status display using rich.status.Status."""
+        from rich.status import Status
+        
+        # 既存のステータスを停止
+        if self._status_obj:
+            self._status_obj.stop()
+            self._status_obj = None
+        
+        # 新しいステータスを開始
+        if self.tool_status:
+            self._status_obj = console.status(
+                f"[{COLORS['tool']}]🔧 {self.tool_status}[/]",
+                spinner="aesthetic"
+            )
+            self._status_obj.start()
+        elif self.thinking_status:
+            self._status_obj = console.status(
+                f"[{COLORS['thinking']}]📡 {self.thinking_status}[/]",
+                spinner="aesthetic"
+            )
+            self._status_obj.start()
+    
+    def clear_status(self) -> None:
+        """Clear all status messages."""
+        self.thinking_status = None
+        self.tool_status = None
+        if self._status_obj:
+            self._status_obj.stop()
+            self._status_obj = None
 
 
 def get_default_coding_instructions() -> str:
