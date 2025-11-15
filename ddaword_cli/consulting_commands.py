@@ -366,8 +366,8 @@ def handle_consulting_command(command: str, assistant_id: str = "agent") -> bool
         console.print(f"  ファイル: {validation_file}")
         console.print()
         console.print("[yellow]承認が必要です[/yellow]")
-        console.print(f"  承認: /consulting:approve {project_name} (戦略立案へ進む)")
-        console.print(f"  否決: /consulting:reject {project_name} (仮説生成に戻る)")
+        console.print(f"  承認: /consulting:approve {project_name} ")
+        console.print(f"  否決: /consulting:reject {project_name} ")
         console.print()
         return True
     
@@ -425,6 +425,7 @@ def handle_consulting_command(command: str, assistant_id: str = "agent") -> bool
         console.print()
         console.print("[yellow]承認が必要です[/yellow]")
         console.print(f"  承認: /consulting:approve {project_name}")
+        console.print(f"  否決: /consulting:reject {project_name} ")
         console.print()
         return True
     
@@ -482,6 +483,7 @@ def handle_consulting_command(command: str, assistant_id: str = "agent") -> bool
         console.print()
         console.print("[yellow]承認が必要です[/yellow]")
         console.print(f"  承認: /consulting:approve {project_name}")
+        console.print(f"  否決: /consulting:reject {project_name} ")
         console.print()
         return True
     

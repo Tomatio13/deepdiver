@@ -279,11 +279,11 @@ async def generate_hypotheses(
         
         # プロンプト構築
         prompt = f"""
-{data_summary}
+        {data_summary}
 
-上記のデータを分析し、経営課題の仮説を生成してください。
-Markdown形式で出力し、各仮説にはID、タイトル、説明、優先度を含めてください。
-"""
+        上記のデータを分析し、経営課題の仮説を生成してください。
+        Markdown形式で出力し、各仮説にはID、タイトル、説明、優先度を含めてください。
+        """
         
         # エージェント呼び出し
         response_text = await _invoke_agent_async(agent, prompt)
@@ -375,18 +375,18 @@ async def process_data_for_validation(
 
         # プロンプト構築
         prompt = f"""
-## 仮説リスト
-{hypotheses_content}
+        ## 仮説リスト
+        {hypotheses_content}
 
-## CSVデータ（複数ファイル）
-{csv_data}
+        ## CSVデータ（複数ファイル）
+        {csv_data}
 
-{feedback_section}
+        {feedback_section}
 
-上記の仮説を検証するために必要なデータを抽出・加工してください。
-複数のCSVファイルがある場合は、ファイル間の関連性も考慮してください。
-Markdown形式で出力し、抽出したデータの概要、集計結果、データの特徴を含めてください。
-"""
+        上記の仮説を検証するために必要なデータを抽出・加工してください。
+        複数のCSVファイルがある場合は、ファイル間の関連性も考慮してください。
+        Markdown形式で出力し、抽出したデータの概要、集計結果、データの特徴を含めてください。
+        """
         
         # エージェント呼び出し
         response_text = await _invoke_agent_async(agent, prompt)
@@ -456,17 +456,17 @@ async def validate_hypotheses(
 
         # プロンプト構築
         prompt = f"""
-## 仮説リスト
-{hypotheses_content}
+        ## 仮説リスト
+        {hypotheses_content}
 
-## 加工済みデータ
-{processed_data_content}
+        ## 加工済みデータ
+        {processed_data_content}
 
-{feedback_section}
+        {feedback_section}
 
-上記のデータを用いて仮説を検証してください。
-Markdown形式で出力し、各仮説の検証結果、根拠となるデータ、主要指標を含めてください。
-"""
+        上記のデータを用いて仮説を検証してください。
+        Markdown形式で出力し、各仮説の検証結果、根拠となるデータ、主要指標を含めてください。
+        """
         
         # エージェント呼び出し
         response_text = await _invoke_agent_async(agent, prompt)
@@ -536,17 +536,17 @@ async def plan_strategies(
 
         # プロンプト構築
         prompt = f"""
-## 仮説リスト
-{hypotheses_content}
+        ## 仮説リスト
+        {hypotheses_content}
 
-## 検証結果
-{validation_content}
+        ## 検証結果
+        {validation_content}
 
-{feedback_section}
+        {feedback_section}
 
-検証済みの課題に対して具体的な対策・戦略を立案してください。
-Markdown形式で出力し、各戦略にID、タイトル、詳細、優先度、期待される影響度、実装難易度、タイムライン、主要アクションを含めてください。
-"""
+        検証済みの課題に対して具体的な対策・戦略を立案してください。
+        Markdown形式で出力し、各戦略にID、タイトル、詳細、優先度、期待される影響度、実装難易度、タイムライン、主要アクションを含めてください。
+        """
         
         # エージェント呼び出し
         response_text = await _invoke_agent_async(agent, prompt)
@@ -626,13 +626,13 @@ async def generate_consulting_report(
 
         # プロンプト構築
         prompt = f"""
-{all_content}
+        {all_content}
 
-{feedback_section}
+        {feedback_section}
 
-上記の情報を統合し、経営コンサルレポートを作成してください。
-Markdown形式で、エグゼクティブサマリー、分析概要、検証された課題、推奨対策、データ可視化の推奨、次のステップを含めてください。
-"""
+        上記の情報を統合し、経営コンサルレポートを作成してください。
+        Markdown形式で、エグゼクティブサマリー、分析概要、検証された課題、推奨対策、データ可視化の推奨、次のステップを含めてください。
+        """
         
         # エージェント呼び出し
         response_text = await _invoke_agent_async(agent, prompt)
