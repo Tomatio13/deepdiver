@@ -9,6 +9,8 @@ from typing import Any
 
 import pandas as pd
 from strands import Agent
+from strands_tools import editor, environment, file_read, file_write, http_request, shell,calculator,current_time
+from .csv_tool import filter_csv_data
 
 from .config import create_model
 from .consulting_prompts import CONSULTING_PROMPTS
@@ -17,6 +19,7 @@ from .consulting_state import get_project_dir, load_state
 # モデルキャッシュ
 _cached_model: Any = None
 
+DEFAULT_TOOLS = [file_read, file_write, editor, shell, http_request, environment,calculator,current_time, filter_csv_data]
 
 def _get_model():
     """モデルインスタンスを取得（キャッシュを使用）。"""
@@ -40,7 +43,7 @@ def _create_consulting_agent(agent_type: str, model: Any) -> Agent:
     return Agent(
         model=model,
         system_prompt=prompt,
-        tools=[],
+        tools=list(DEFAULT_TOOLS),
     )
 
 
@@ -314,31 +317,31 @@ async def process_data_for_validation(
     """
     try:
         csv_paths = state.get("csv_paths", [])
-        if not csv_paths:
-            # 後方互換性のため、csv_pathもチェック
-            csv_path = state.get("csv_path", "")
-            if csv_path:
-                csv_paths = [csv_path]
-            else:
-                raise ValueError("CSVファイルが指定されていません。")
+        # if not csv_paths:
+        #     # 後方互換性のため、csv_pathもチェック
+        #     csv_path = state.get("csv_path", "")
+        #     if csv_path:
+        #         csv_paths = [csv_path]
+        #     else:
+        #         raise ValueError("CSVファイルが指定されていません。")
         
-        # 複数のCSVファイルを読み込む
-        dfs = []
-        csv_data_parts = []
+        # # 複数のCSVファイルを読み込む
+        # dfs = []
+        # csv_data_parts = []
         
-        for csv_path in csv_paths:
-            csv_file = Path(csv_path)
-            if not csv_file.is_absolute():
-                csv_file = Path.cwd() / csv_file
+        # for csv_path in csv_paths:
+        #     csv_file = Path(csv_path)
+        #     if not csv_file.is_absolute():
+        #         csv_file = Path.cwd() / csv_file
             
-            if not csv_file.exists():
-                raise FileNotFoundError(f"CSVファイルが見つかりません: {csv_path}")
+        #     if not csv_file.exists():
+        #         raise FileNotFoundError(f"CSVファイルが見つかりません: {csv_path}")
             
-            df = _read_csv_with_encoding(csv_file)
-            dfs.append(df)
-            csv_data_parts.append(f"## ファイル: {csv_file.name}\n{df.to_string()}")
+        #     df = _read_csv_with_encoding(csv_file)
+        #     dfs.append(df)
+        #     csv_data_parts.append(f"## ファイル: {csv_file.name}\n{df.to_string()}")
         
-        csv_data = "\n\n".join(csv_data_parts)
+        # csv_data = "\n\n".join(csv_data_parts)
         
         # 仮説を取得
         project_dir = get_project_dir(project_name)
@@ -379,11 +382,17 @@ async def process_data_for_validation(
         {hypotheses_content}
 
         ## CSVデータ（複数ファイル）
-        {csv_data}
+        {csv_paths}
 
         {feedback_section}
 
         上記の仮説を検証するために必要なデータを抽出・加工してください。
+
+        ## プロジェクトディレクトリ
+        Pythonのコードは、このプロジェクトディレクトリ内で作成・実行してください。
+        {project_dir}
+
+
         複数のCSVファイルがある場合は、ファイル間の関連性も考慮してください。
         Markdown形式で出力し、抽出したデータの概要、集計結果、データの特徴を含めてください。
         """

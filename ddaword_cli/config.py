@@ -2,11 +2,14 @@
 
 import json
 import os
+from contextlib import nullcontext
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import dotenv
+
 from rich.console import Console
+from rich.live import Live
 
 dotenv.load_dotenv()
 
@@ -82,6 +85,15 @@ MAX_ARG_LENGTH = 150
 
 # Rich console instance
 console = Console(highlight=False, force_terminal=True)
+
+# Liveインスタンスを共有（Live表示と入力処理の競合回避用）
+current_live: Optional[Live] = None
+
+
+def set_live(live: Optional[Live]) -> None:
+    """Set the current Live instance for shared state management."""
+    global current_live
+    current_live = live
 
 
 class SessionState:

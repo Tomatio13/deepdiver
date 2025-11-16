@@ -3,17 +3,101 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import re
 import sys
 from collections.abc import Callable
 from typing import Any, Iterable
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.key_binding import KeyBindings
+from rich import box
 from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.text import Text
 
 from .config import COLORS, console
 from .input import parse_file_mentions
+from .ui import render_todos_panel, toast
+
+
+def looks_like_markdown(text: str) -> bool:
+    """Check if text looks like markdown format.
+    
+    Args:
+        text: Text to check
+        
+    Returns:
+        True if text contains markdown-like patterns
+    """
+    return any(token in text for token in ("```", "# ", "- ", "* ", "`"))
+
+
+def extract_todos_from_text(text: str) -> list[dict] | None:
+    """Extract todos list from agent output text.
+    
+    Looks for JSON blocks containing "todos" array in the text.
+    Handles various formats including code blocks with extra whitespace.
+    
+    Args:
+        text: Agent output text that may contain JSON todos
+        
+    Returns:
+        List of todo dictionaries if found, None otherwise
+    """
+    # Try to find JSON block with todos
+    # Pattern 1: ```json code block (most common)
+    # Pattern 2: ``` generic code block
+    # Pattern 3: Inline JSON (less common, more fragile)
+    
+    # First, try to extract from code blocks (more reliable)
+    code_block_patterns = [
+        r'```json\s*(\{[\s\S]*?"todos"[\s\S]*?\})\s*```',  # JSON code block
+        r'```\s*(\{[\s\S]*?"todos"[\s\S]*?\})\s*```',  # Generic code block
+    ]
+    
+    for pattern in code_block_patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        for match in matches:
+            try:
+                # Clean up whitespace
+                cleaned = re.sub(r'\n\s*\n', '\n', match)  # Remove extra blank lines
+                data = json.loads(cleaned)
+                if "todos" in data and isinstance(data["todos"], list):
+                    return data["todos"]
+            except json.JSONDecodeError:
+                continue
+    
+    # Fallback: try inline JSON (less reliable due to greedy matching)
+    inline_pattern = r'(\{[^{}]*?"todos"[^{}]*?\})'
+    matches = re.findall(inline_pattern, text, re.DOTALL | re.IGNORECASE)
+    for match in matches:
+        try:
+            data = json.loads(match)
+            if "todos" in data and isinstance(data["todos"], list):
+                return data["todos"]
+        except json.JSONDecodeError:
+            continue
+    
+    return None
+
+
+def render_agent_output(raw: str, title: str = "Agent") -> Panel:
+    """Render agent output with automatic markdown/ANSI detection.
+    
+    Args:
+        raw: Raw output text from agent
+        title: Panel title
+        
+    Returns:
+        Panel with rendered content
+    """
+    if looks_like_markdown(raw):
+        body = Markdown(raw)
+    else:
+        body = Text.from_ansi(raw) if "\x1b[" in raw else Text(raw)
+        body.overflow = "fold"
+    return Panel(body, title=title, border_style="cyan", box=box.ROUNDED, padding=(1, 2))
 
 
 def _assemble_prompt(user_input: str) -> str:
@@ -176,6 +260,9 @@ def _render_tool_stream_event(event: dict) -> None:
 def _ask_tool_approval_sync(tool_name: str, tool_data: dict) -> bool:
     """Ask user for approval before executing a tool (synchronous version).
     
+    Uses Rich's Confirm prompt with Panel display for better UX.
+    Handles Live display conflicts by pausing if active.
+    
     Args:
         tool_name: Name of the tool to be executed
         tool_data: Tool execution data/arguments
@@ -183,23 +270,26 @@ def _ask_tool_approval_sync(tool_name: str, tool_data: dict) -> bool:
     Returns:
         True if approved, False if rejected
     """
-    console.print()
-    console.print(f"[yellow]🔧 Tool execution requested: {tool_name}[/yellow]")
-    # console.print(
-    #     Panel(
-    #         _stringify_response(tool_data),
-    #         title="Tool Arguments",
-    #         border_style=COLORS["tool"],
-    #     )
-    # )
+    from contextlib import nullcontext
     
-    # Use simple input() for synchronous confirmation
-    # This is needed because callback handlers are synchronous
-    try:
-        response = input("Execute this tool? (y/n): ").strip().lower()
-        return response == "y"
-    except (EOFError, KeyboardInterrupt):
-        return False
+    from rich.prompt import Confirm
+    
+    from .config import current_live
+    
+    # Live表示を一時停止（存在する場合）
+    cm = (
+        current_live.pause() if current_live and hasattr(current_live, "pause") else nullcontext()
+    )
+    
+    with cm:
+        console.print()
+        body = Text(f"Tool execution requested: {tool_name}", style="bold yellow")
+        console.print(Panel(body, border_style="yellow", box=box.ROUNDED, padding=(1, 2)))
+        
+        try:
+            return Confirm.ask("Execute this tool?", default=False)
+        except (EOFError, KeyboardInterrupt):
+            return False
 
 
 async def _ask_tool_approval_async(tool_name: str, tool_data: dict) -> bool:
@@ -281,7 +371,7 @@ def _handle_tool_use(
             session_state.set_tool_status(f"Tool executing: {tool_name}...")
         else:
             if not approved:
-                console.print("[red]Tool execution rejected by user[/red]")
+                toast("Tool execution rejected by user", kind="error")
             # ツール実行が拒否された場合はステータスを停止
             session_state.set_tool_status(None)
             # 注意: Strands Agentのコールバックハンドラーでは、
@@ -397,9 +487,7 @@ async def _stream_agent(
             # 強制停止イベントのチェック
             if event.get("force_stop", False):
                 reason = event.get("force_stop_reason", "unknown reason")
-                console.print(
-                    f"\n[yellow]⚠️ Stream force-stopped: {reason}[/yellow]"
-                )
+                toast(f"⚠️ Stream force-stopped: {reason}", kind="warning")
 
             # ライフサイクルイベントの表示（デバッグモードのみ）
             # _render_lifecycle_event(event, debug_mode)
@@ -439,16 +527,14 @@ async def _stream_agent(
         # Ctrl+Cで中断された場合
         if session_state:
             session_state.clear_status()
-        console.print("\n[yellow]Stream interrupted by user[/yellow]")
+        toast("Stream interrupted by user", kind="warning")
         combined = final_response or "".join(response_buffer)
         return combined.strip() or None
     except Exception as exc:  # noqa: BLE001 - fall back to non-streaming
         # エラー時はステータス表示をクリアしてからメッセージを表示
         if session_state:
             session_state.clear_status()
-        console.print(
-            f"\n[yellow]Streaming unavailable, falling back to blocking call ({exc}).[/yellow]"
-        )
+        toast(f"Streaming unavailable, falling back to blocking call ({exc})", kind="warning")
         return await _invoke_agent(agent, prompt)
 
 
@@ -479,13 +565,30 @@ async def execute_task(
         response_text = await _stream_agent(agent, final_input, session_state)
         # ストリーミング中に既に内容が表示されているため、改行のみ追加
         console.print()
+        
+        # ストリーミング完了後、ToDoリストを抽出して表示
+        if response_text:
+            todos = extract_todos_from_text(response_text)
+            if todos:
+                console.print()
+                console.print(render_todos_panel(todos))
+                console.print()
     else:
         response_text = await _invoke_agent(agent, final_input)
         # response_textがNoneの場合は空文字列にフォールバック
         if response_text is None:
             response_text = ""
         
-        console.print()
-        console.print(Markdown(response_text), style=COLORS["agent"])
-        console.print()
+        # Markdown/ANSI自動判別を使用して出力をレンダリング
+        if response_text:
+            console.print()
+            console.print(render_agent_output(response_text, title="Agent"))
+            
+            # ToDoリストを抽出して表示
+            todos = extract_todos_from_text(response_text)
+            if todos:
+                console.print()
+                console.print(render_todos_panel(todos))
+            
+            console.print()
 

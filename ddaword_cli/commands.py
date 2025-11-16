@@ -6,7 +6,7 @@ from pathlib import Path
 from .agent import AGENT_ROOT
 from .config import COLORS, DDAWORD_ASCII, console, get_current_model_info
 from .mcp_tools import get_mcp_server_info
-from .ui import show_interactive_help
+from .ui import show_interactive_help, toast
 
 
 def handle_command(command: str, assistant_id: str = "agent") -> str | bool:
@@ -44,8 +44,7 @@ def handle_command(command: str, assistant_id: str = "agent") -> str | bool:
             else:
                 console.print("  Model: [dim](not specified, using provider defaults)[/dim]", style=COLORS["dim"])
         else:
-            console.print("[yellow]No model provider configured.[/yellow]")
-            console.print("[dim]Set STRANDS_MODEL_PROVIDER environment variable to configure a model.[/dim]")
+            toast("No model provider configured.\nSet STRANDS_MODEL_PROVIDER environment variable to configure a model.", kind="warning")
         console.print()
         return True
 
@@ -59,14 +58,13 @@ def handle_command(command: str, assistant_id: str = "agent") -> str | bool:
         mcp_config_path = agent_dir / "mcp.json"
 
         if not mcp_config_path.exists():
-            console.print(f"[yellow]No mcp.json found at: {mcp_config_path}[/yellow]")
-            console.print("[dim]Create mcp.json in the agent directory to configure MCP servers.[/dim]")
+            toast(f"No mcp.json found at: {mcp_config_path}\nCreate mcp.json in the agent directory to configure MCP servers.", kind="warning")
             console.print()
             return True
 
         server_info_list = get_mcp_server_info(assistant_id)
         if not server_info_list:
-            console.print("[yellow]No MCP servers configured.[/yellow]")
+            toast("No MCP servers configured.", kind="warning")
             console.print()
             return True
 
@@ -91,9 +89,7 @@ def handle_command(command: str, assistant_id: str = "agent") -> str | bool:
         from .consulting_commands import handle_consulting_command
         return handle_consulting_command(stripped_command, assistant_id)
 
-    console.print()
-    console.print(f"[yellow]Unknown command: /{cmd_lower}[/yellow]")
-    console.print("[dim]Type /help for available commands.[/dim]")
+    toast(f"Unknown command: /{cmd_lower}\nType /help for available commands.", kind="warning")
     console.print()
     return True
 
@@ -130,10 +126,10 @@ def execute_bash_command(command: str) -> bool:
         return True
 
     except subprocess.TimeoutExpired:
-        console.print("[red]Command timed out after 30 seconds[/red]")
+        toast("Command timed out after 30 seconds", kind="error")
         console.print()
         return True
     except Exception as e:
-        console.print(f"[red]Error executing command: {e}[/red]")
+        toast(f"Error executing command: {e}", kind="error")
         console.print()
         return True
