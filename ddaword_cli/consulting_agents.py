@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +15,13 @@ from .csv_tool import filter_csv_data
 
 from .config import create_model
 from .consulting_prompts import CONSULTING_PROMPTS
-from .consulting_state import get_project_dir, load_state
+from .consulting_state import (
+    get_project_dir,
+    load_state,
+    initialize_process_data_tasks,
+    get_pending_process_data_tasks,
+    update_process_data_task_status,
+)
 
 # モデルキャッシュ
 _cached_model: Any = None
@@ -302,11 +309,70 @@ async def generate_hypotheses(
         return state
 
 
+def extract_hypothesis_ids(hypotheses_content: str) -> list[str]:
+    """仮説ファイルの内容から仮説ID（H1, H2, H3...）を抽出する。
+    
+    Args:
+        hypotheses_content: 仮説ファイルの内容
+        
+    Returns:
+        仮説IDのリスト（例: ["H1", "H2", "H3"]）
+    """
+    # H1, H2, H3... のパターンを検索
+    pattern = r'\bH\d+\b'
+    matches = re.findall(pattern, hypotheses_content, re.IGNORECASE)
+    
+    # 重複を除去し、数値順にソート
+    unique_ids = sorted(set(matches), key=lambda x: int(re.search(r'\d+', x).group()))
+    
+    return unique_ids
+
+
+def extract_hypothesis_section(hypotheses_content: str, hypothesis_id: str) -> str:
+    """仮説ファイルから特定の仮説IDのセクションを抽出する。
+    
+    Args:
+        hypotheses_content: 仮説ファイルの内容
+        hypothesis_id: 仮説ID（例: "H1"）
+        
+    Returns:
+        仮説セクションの内容
+    """
+    # 仮説IDで始まるセクションを検索
+    pattern = rf'(?i)(##?\s*{re.escape(hypothesis_id)}[^\n]*\n.*?)(?=\n##?\s*H\d+|$)'
+    match = re.search(pattern, hypotheses_content, re.DOTALL)
+    
+    if match:
+        return match.group(1).strip()
+    
+    # 見つからない場合は、仮説IDを含む行から次のHで始まる行まで
+    lines = hypotheses_content.split('\n')
+    start_idx = None
+    for i, line in enumerate(lines):
+        if re.search(rf'\b{re.escape(hypothesis_id)}\b', line, re.IGNORECASE):
+            start_idx = i
+            break
+    
+    if start_idx is not None:
+        # 次のHで始まる行を探す
+        end_idx = len(lines)
+        for i in range(start_idx + 1, len(lines)):
+            if re.search(r'^##?\s*H\d+', lines[i], re.IGNORECASE):
+                end_idx = i
+                break
+        return '\n'.join(lines[start_idx:end_idx]).strip()
+    
+    return ""
+
+
 async def process_data_for_validation(
     state: dict[str, Any],
     project_name: str,
 ) -> dict[str, Any]:
     """仮説検証用にデータを加工し、統合データ構造を更新する。
+    
+    仮説ごとにタスクを作成し、未完了のタスクから順に処理します。
+    各タスクの結果は個別のファイルに保存されます。
     
     Args:
         state: 統合データ構造
@@ -317,31 +383,6 @@ async def process_data_for_validation(
     """
     try:
         csv_paths = state.get("csv_paths", [])
-        # if not csv_paths:
-        #     # 後方互換性のため、csv_pathもチェック
-        #     csv_path = state.get("csv_path", "")
-        #     if csv_path:
-        #         csv_paths = [csv_path]
-        #     else:
-        #         raise ValueError("CSVファイルが指定されていません。")
-        
-        # # 複数のCSVファイルを読み込む
-        # dfs = []
-        # csv_data_parts = []
-        
-        # for csv_path in csv_paths:
-        #     csv_file = Path(csv_path)
-        #     if not csv_file.is_absolute():
-        #         csv_file = Path.cwd() / csv_file
-            
-        #     if not csv_file.exists():
-        #         raise FileNotFoundError(f"CSVファイルが見つかりません: {csv_path}")
-            
-        #     df = _read_csv_with_encoding(csv_file)
-        #     dfs.append(df)
-        #     csv_data_parts.append(f"## ファイル: {csv_file.name}\n{df.to_string()}")
-        
-        # csv_data = "\n\n".join(csv_data_parts)
         
         # 仮説を取得
         project_dir = get_project_dir(project_name)
@@ -350,6 +391,37 @@ async def process_data_for_validation(
             raise ValueError("仮説ファイルが見つかりません。先に仮説を生成してください。")
         
         hypotheses_content = hypotheses_file.read_text()
+        
+        # 仮説IDを抽出
+        hypothesis_ids = extract_hypothesis_ids(hypotheses_content)
+        
+        if not hypothesis_ids:
+            raise ValueError("仮説IDが見つかりません。仮説ファイルを確認してください。")
+        
+        # タスクを初期化
+        initialize_process_data_tasks(project_name, hypothesis_ids)
+        
+        # 未完了のタスクを取得
+        pending_tasks = get_pending_process_data_tasks(project_name)
+        
+        if not pending_tasks:
+            # すべてのタスクが完了している場合
+            state = load_state(project_name)
+            # 統合ファイルを作成（既存の個別ファイルを結合）
+            all_outputs = []
+            tasks = state["steps"]["process_data"].get("tasks", {})
+            for hypothesis_id in sorted(hypothesis_ids, key=lambda x: int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else 0):
+                task = tasks.get(hypothesis_id, {})
+                output_file = task.get("output_file")
+                if output_file:
+                    output_path = project_dir / output_file
+                    if output_path.exists():
+                        all_outputs.append(f"# {hypothesis_id}\n\n{output_path.read_text()}\n\n")
+            
+            if all_outputs:
+                state["processed_data_markdown"] = "\n".join(all_outputs)
+            
+            return state
         
         # エージェント作成
         model = _get_model()
@@ -376,32 +448,112 @@ async def process_data_for_validation(
                 lines.append(f"{prefix}{reason}")
             feedback_section = "\n## レビューコメント\n" + "\n".join(lines) + "\n"
 
-        # プロンプト構築
-        prompt = f"""
-        ## 仮説リスト
-        {hypotheses_content}
-
-        ## CSVデータ（複数ファイル）
-        {csv_paths}
-
-        {feedback_section}
-
-        上記の仮説を検証するために必要なデータを抽出・加工してください。
-
-        ## プロジェクトディレクトリ
-        Pythonのコードは、このプロジェクトディレクトリ内で作成・実行してください。
-        {project_dir}
-
-
-        複数のCSVファイルがある場合は、ファイル間の関連性も考慮してください。
-        Markdown形式で出力し、抽出したデータの概要、集計結果、データの特徴を含めてください。
-        """
+        # CSVファイルの概要を取得（コンテキスト節約のため）
+        csv_summary = []
+        for csv_path in csv_paths:
+            csv_file = Path(csv_path)
+            if not csv_file.is_absolute():
+                csv_file = Path.cwd() / csv_file
+            
+            if csv_file.exists():
+                try:
+                    df = _read_csv_with_encoding(csv_file)
+                    csv_summary.append(f"- {csv_file.name}: {len(df)}行, {len(df.columns)}列 ({', '.join(df.columns.tolist()[:5])}...)")
+                except Exception as e:
+                    csv_summary.append(f"- {csv_file.name}: 読み込みエラー ({e})")
         
-        # エージェント呼び出し
-        response_text = await _invoke_agent_async(agent, prompt)
+        csv_summary_text = "\n".join(csv_summary)
         
-        # Markdownを保存
-        state["processed_data_markdown"] = response_text
+        # 各タスクを順に処理
+        processed_outputs = []
+        
+        for hypothesis_id in pending_tasks:
+            try:
+                # タスクステータスをin_progressに更新
+                update_process_data_task_status(project_name, hypothesis_id, "in_progress")
+                
+                # 該当仮説のセクションを抽出
+                hypothesis_section = extract_hypothesis_section(hypotheses_content, hypothesis_id)
+                
+                if not hypothesis_section:
+                    # 仮説セクションが見つからない場合は、仮説IDを含む行を探す
+                    lines = hypotheses_content.split('\n')
+                    for i, line in enumerate(lines):
+                        if re.search(rf'\b{re.escape(hypothesis_id)}\b', line, re.IGNORECASE):
+                            # 次の数行を含める
+                            hypothesis_section = '\n'.join(lines[max(0, i-2):min(len(lines), i+20)])
+                            break
+                
+                # プロンプト構築（1つの仮説のみ）
+                prompt = f"""
+## 仮説: {hypothesis_id}
+
+{hypothesis_section}
+
+## CSVファイル一覧
+{csv_summary_text}
+
+{feedback_section}
+
+上記の仮説 {hypothesis_id} を検証するために必要なデータを抽出・加工してください。
+
+## プロジェクトディレクトリ
+Pythonのコードは、このプロジェクトディレクトリ内で作成・実行してください。
+{project_dir}
+
+複数のCSVファイルがある場合は、ファイル間の関連性も考慮してください。
+Markdown形式で出力し、抽出したデータの概要、集計結果、データの特徴を含めてください。
+"""
+                
+                # エージェント呼び出し
+                response_text = await _invoke_agent_async(agent, prompt)
+                
+                # 個別ファイルに保存
+                output_file = f"processed_data_{hypothesis_id}.md"
+                output_path = project_dir / output_file
+                output_path.write_text(response_text)
+                
+                # タスクステータスを完了に更新
+                update_process_data_task_status(
+                    project_name,
+                    hypothesis_id,
+                    "completed",
+                    output_file=output_file,
+                )
+                
+                processed_outputs.append(f"# {hypothesis_id}\n\n{response_text}\n\n")
+                
+            except Exception as e:
+                # タスクステータスを失敗に更新
+                error_msg = str(e)
+                update_process_data_task_status(
+                    project_name,
+                    hypothesis_id,
+                    "failed",
+                    error=error_msg,
+                )
+                state["errors"] = state.get("errors", [])
+                state["errors"].append(f"仮説 {hypothesis_id} のデータ加工に失敗しました: {e}")
+                # エラーが発生しても次のタスクを続行
+        
+        # 統合ファイルを作成
+        if processed_outputs:
+            state["processed_data_markdown"] = "\n".join(processed_outputs)
+        
+        # 既存の完了済みタスクの内容も統合ファイルに追加
+        state = load_state(project_name)
+        tasks = state["steps"]["process_data"].get("tasks", {})
+        all_outputs = []
+        for hypothesis_id in sorted(hypothesis_ids, key=lambda x: int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else 0):
+            task = tasks.get(hypothesis_id, {})
+            output_file = task.get("output_file")
+            if output_file:
+                output_path = project_dir / output_file
+                if output_path.exists():
+                    all_outputs.append(f"# {hypothesis_id}\n\n{output_path.read_text()}\n\n")
+        
+        if all_outputs:
+            state["processed_data_markdown"] = "\n".join(all_outputs)
         
         return state
         

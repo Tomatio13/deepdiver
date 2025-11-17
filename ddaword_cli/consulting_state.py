@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -214,4 +215,121 @@ def get_current_project() -> str | None:
     
     latest_project = max(projects, key=get_mtime)
     return latest_project.name
+
+
+def initialize_process_data_tasks(project_name: str, hypothesis_ids: list[str]) -> None:
+    """process_dataステップのタスクを初期化する。
+    
+    Args:
+        project_name: プロジェクト名
+        hypothesis_ids: 仮説IDのリスト（例: ["H1", "H2", "H3"]）
+    """
+    state = load_state(project_name)
+    
+    # process_dataステップにtasksフィールドがない場合は初期化
+    if "tasks" not in state["steps"]["process_data"]:
+        state["steps"]["process_data"]["tasks"] = {}
+    
+    tasks = state["steps"]["process_data"]["tasks"]
+    
+    # 既存のタスクを保持しつつ、新しい仮説IDのタスクを追加
+    for hypothesis_id in hypothesis_ids:
+        if hypothesis_id not in tasks:
+            tasks[hypothesis_id] = {
+                "status": "pending",
+                "output_file": None,
+                "started_at": None,
+                "completed_at": None,
+                "error": None,
+            }
+    
+    # 存在しない仮説IDのタスクを削除（仮説が削除された場合）
+    existing_ids = set(tasks.keys())
+    new_ids = set(hypothesis_ids)
+    for removed_id in existing_ids - new_ids:
+        del tasks[removed_id]
+    
+    save_state(project_name, state)
+
+
+def get_pending_process_data_tasks(project_name: str) -> list[str]:
+    """未完了のprocess_dataタスクのIDリストを取得する。
+    
+    Args:
+        project_name: プロジェクト名
+        
+    Returns:
+        未完了タスクの仮説IDリスト
+    """
+    state = load_state(project_name)
+    tasks = state["steps"]["process_data"].get("tasks", {})
+    
+    pending_tasks = []
+    for hypothesis_id, task_info in tasks.items():
+        status = task_info.get("status", "pending")
+        if status in ["pending", "in_progress", "failed"]:
+            pending_tasks.append(hypothesis_id)
+    
+    # 数値順にソート
+    pending_tasks.sort(key=lambda x: int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else 0)
+    
+    return pending_tasks
+
+
+def update_process_data_task_status(
+    project_name: str,
+    hypothesis_id: str,
+    status: str,
+    output_file: str | None = None,
+    error: str | None = None,
+) -> None:
+    """process_dataタスクのステータスを更新する。
+    
+    Args:
+        project_name: プロジェクト名
+        hypothesis_id: 仮説ID（例: "H1"）
+        status: ステータス（"pending", "in_progress", "completed", "failed"）
+        output_file: 出力ファイル名（オプション）
+        error: エラーメッセージ（オプション、failedの場合）
+    """
+    state = load_state(project_name)
+    
+    if "tasks" not in state["steps"]["process_data"]:
+        state["steps"]["process_data"]["tasks"] = {}
+    
+    if hypothesis_id not in state["steps"]["process_data"]["tasks"]:
+        state["steps"]["process_data"]["tasks"][hypothesis_id] = {
+            "status": "pending",
+            "output_file": None,
+            "started_at": None,
+            "completed_at": None,
+            "error": None,
+        }
+    
+    task = state["steps"]["process_data"]["tasks"][hypothesis_id]
+    task["status"] = status
+    
+    if status == "in_progress" and not task.get("started_at"):
+        task["started_at"] = datetime.now().isoformat()
+    
+    if status == "completed":
+        task["completed_at"] = datetime.now().isoformat()
+        if output_file:
+            task["output_file"] = output_file
+    
+    if status == "failed":
+        task["error"] = error
+    
+    # すべてのタスクが完了したら、process_dataステップも完了にする
+    all_tasks = state["steps"]["process_data"]["tasks"]
+    all_completed = all(
+        task_info.get("status") == "completed"
+        for task_info in all_tasks.values()
+    )
+    
+    if all_completed and all_tasks:
+        state["steps"]["process_data"]["status"] = "completed"
+        state["steps"]["process_data"]["completed_at"] = datetime.now().isoformat()
+    
+    save_state(project_name, state)
 

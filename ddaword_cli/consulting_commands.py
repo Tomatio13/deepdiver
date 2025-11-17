@@ -18,6 +18,7 @@ from .consulting_state import (
     approve_step,
     reject_step,
     add_feedback,
+    get_pending_process_data_tasks,
 )
 from .consulting_agents import (
     generate_hypotheses,
@@ -284,6 +285,34 @@ def handle_consulting_command(command: str, assistant_id: str = "agent") -> bool
             console.print()
             return True
         
+        # タスク状況を確認
+        pending_tasks = get_pending_process_data_tasks(project_name)
+        state = load_state(project_name)
+        tasks = state["steps"]["process_data"].get("tasks", {})
+        
+        if tasks:
+            console.print("[bold]タスク状況:[/bold]")
+            for hypothesis_id in sorted(tasks.keys(), key=lambda x: int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else 0):
+                task = tasks[hypothesis_id]
+                status = task.get("status", "pending")
+                if status == "completed":
+                    console.print(f"  [green]✓ {hypothesis_id}: 完了[/green]")
+                elif status == "in_progress":
+                    console.print(f"  [yellow]→ {hypothesis_id}: 処理中[/yellow]")
+                elif status == "failed":
+                    error = task.get("error", "")
+                    console.print(f"  [red]✗ {hypothesis_id}: 失敗[/red]")
+                    if error:
+                        console.print(f"    [dim]エラー: {error[:100]}[/dim]")
+                else:
+                    console.print(f"  [dim]○ {hypothesis_id}: 未実施[/dim]")
+            console.print()
+        
+        if pending_tasks:
+            console.print(f"[dim]未完了タスク数: {len(pending_tasks)}[/dim]")
+            console.print(f"[dim]処理中のタスク: {', '.join(pending_tasks)}[/dim]")
+            console.print()
+        
         console.print("[dim]データを整理・加工中...[/dim]")
         
         try:
@@ -299,18 +328,34 @@ def handle_consulting_command(command: str, assistant_id: str = "agent") -> bool
             console.print()
             return True
         
-        # Markdownファイルに保存
+        # Markdownファイルに保存（統合ファイル）
         project_dir = get_project_dir(project_name)
         processed_data_file = project_dir / "processed_data.md"
-        processed_data_file.write_text(state.get("processed_data_markdown", ""))
+        if state.get("processed_data_markdown"):
+            processed_data_file.write_text(state.get("processed_data_markdown", ""))
         
-        update_step_status(project_name, "process_data", "completed", "processed_data.md")
+        # タスク状況を再確認
+        state = load_state(project_name)
+        tasks = state["steps"]["process_data"].get("tasks", {})
+        completed_count = sum(1 for t in tasks.values() if t.get("status") == "completed")
+        total_count = len(tasks)
         
-        console.print(f"[green]✓ データを整理・加工しました[/green]")
-        console.print(f"  ファイル: {processed_data_file}")
-        console.print()
-        console.print(f"[dim]次のステップ: /consulting:validate {project_name}[/dim]")
-        console.print()
+        if completed_count == total_count and total_count > 0:
+            update_step_status(project_name, "process_data", "completed", "processed_data.md")
+            console.print(f"[green]✓ すべてのタスクが完了しました[/green]")
+            console.print(f"  完了タスク数: {completed_count}/{total_count}")
+            console.print(f"  統合ファイル: {processed_data_file}")
+            console.print()
+            console.print(f"[dim]次のステップ: /consulting:validate {project_name}[/dim]")
+            console.print()
+        else:
+            console.print(f"[yellow]部分完了: {completed_count}/{total_count} タスク完了[/yellow]")
+            remaining = get_pending_process_data_tasks(project_name)
+            if remaining:
+                console.print(f"[dim]残りのタスク: {', '.join(remaining)}[/dim]")
+                console.print(f"[dim]再実行: /consulting:process-data {project_name}[/dim]")
+            console.print()
+        
         return True
     
     # /consulting:validate <project_name>
@@ -705,6 +750,25 @@ def handle_consulting_command(command: str, assistant_id: str = "agent") -> bool
                 status_display += f" - {output_file}"
             
             console.print(f"  {step_name}: {status_display}")
+            
+            # process_dataステップの場合はタスク状況も表示
+            if step_name == "process_data" and "tasks" in step_info:
+                tasks = step_info["tasks"]
+                if tasks:
+                    completed = sum(1 for t in tasks.values() if t.get("status") == "completed")
+                    total = len(tasks)
+                    console.print(f"    タスク: {completed}/{total} 完了")
+                    for hypothesis_id in sorted(tasks.keys(), key=lambda x: int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else 0):
+                        task = tasks[hypothesis_id]
+                        task_status = task.get("status", "pending")
+                        if task_status == "completed":
+                            console.print(f"      [green]✓ {hypothesis_id}[/green]")
+                        elif task_status == "failed":
+                            console.print(f"      [red]✗ {hypothesis_id}[/red]")
+                        elif task_status == "in_progress":
+                            console.print(f"      [yellow]→ {hypothesis_id}[/yellow]")
+                        else:
+                            console.print(f"      [dim]○ {hypothesis_id}[/dim]")
         
         if state.get("retry_count", 0) > 0:
             console.print()
