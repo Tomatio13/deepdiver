@@ -25,8 +25,12 @@ def get_project_dir(project_name: str) -> Path:
     return project_dir
 
 
+# 状態キャッシュ: {project_name: {"data": state_dict, "mtime": float}}
+_state_cache: dict[str, dict[str, Any]] = {}
+
+
 def load_state(project_name: str) -> dict[str, Any]:
-    """consulting.jsonを読み込む。
+    """consulting.jsonを読み込む（キャッシュ対応）。
     
     Args:
         project_name: プロジェクト名
@@ -37,6 +41,17 @@ def load_state(project_name: str) -> dict[str, Any]:
     project_dir = get_project_dir(project_name)
     state_file = project_dir / "consulting.json"
     
+    # キャッシュチェック
+    current_mtime = 0.0
+    if state_file.exists():
+        current_mtime = state_file.stat().st_mtime
+        
+    if project_name in _state_cache:
+        cache_entry = _state_cache[project_name]
+        # キャッシュが有効（ファイルの更新日時がキャッシュの記録と同じか古い）ならキャッシュを返す
+        if current_mtime <= cache_entry["mtime"]:
+            return cache_entry["data"]
+    
     if state_file.exists():
         state = json.loads(state_file.read_text())
         # 既存の状態にfeedbackフィールドがない場合は初期化
@@ -44,10 +59,16 @@ def load_state(project_name: str) -> dict[str, Any]:
         for step in ["hypothesis", "process_data", "validate", "strategy", "report"]:
             if step in steps:
                 steps[step].setdefault("feedback", [])
+        
+        # キャッシュ更新
+        _state_cache[project_name] = {
+            "data": state,
+            "mtime": current_mtime
+        }
         return state
     
     # 初期状態を作成
-    return {
+    initial_state = {
         "version": "1.0",
         "project_name": project_name,
         "csv_paths": [],
@@ -96,10 +117,13 @@ def load_state(project_name: str) -> dict[str, Any]:
         "retry_count": 0,
         "max_retry": 3,
     }
+    
+    # 新規作成時はキャッシュしない（ファイルがないためmtimeが0）
+    return initial_state
 
 
 def save_state(project_name: str, state: dict[str, Any]) -> None:
-    """consulting.jsonを保存。
+    """consulting.jsonを保存（キャッシュ更新）。
     
     Args:
         project_name: プロジェクト名
@@ -108,7 +132,15 @@ def save_state(project_name: str, state: dict[str, Any]) -> None:
     project_dir = get_project_dir(project_name)
     state_file = project_dir / "consulting.json"
     state["updated_at"] = datetime.now().isoformat()
+    
+    # ファイル書き込み
     state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2))
+    
+    # キャッシュ更新（mtimeを最新に）
+    _state_cache[project_name] = {
+        "data": state,
+        "mtime": state_file.stat().st_mtime
+    }
 
 
 def update_step_status(

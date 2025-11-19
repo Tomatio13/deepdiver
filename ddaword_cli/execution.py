@@ -107,16 +107,36 @@ def _assemble_prompt(user_input: str) -> str:
         return prompt_text
 
     context_parts = [prompt_text, "\n\n## Referenced Files\n"]
+    MAX_FILE_CHARS = 20000
+    TRUNCATE_HEAD = 10000
+    TRUNCATE_TAIL = 10000
+
     for file_path in mentioned_files:
         try:
+            # Check file size before reading to avoid reading massive files into memory
+            if file_path.stat().st_size > 10 * 1024 * 1024: # 10MB limit
+                context_parts.append(
+                    f"\n### {file_path.name}\n[File too large to read (size: {file_path.stat().st_size} bytes). Please use tools to read specific parts.]"
+                )
+                console.print(f"[yellow]Warning: File {file_path.name} is too large (10MB+), skipped content injection.[/yellow]")
+                continue
+
             content = file_path.read_text()
-            if len(content) > 50000:
-                content = content[:50000] + "\n... (file truncated)"
+            if len(content) > MAX_FILE_CHARS:
+                original_len = len(content)
+                content = (
+                    content[:TRUNCATE_HEAD]
+                    + f"\n... (file truncated, {original_len - MAX_FILE_CHARS} chars hidden) ...\n"
+                    + content[-TRUNCATE_TAIL:]
+                )
+                console.print(f"[yellow]Warning: File {file_path.name} truncated (kept first/last {TRUNCATE_HEAD//1000}k chars).[/yellow]")
+            
             context_parts.append(
                 f"\n### {file_path.name}\nPath: `{file_path}`\n```\n{content}\n```"
             )
         except Exception as exc:  # noqa: BLE001
             context_parts.append(f"\n### {file_path.name}\n[Error reading file: {exc}]")
+            console.print(f"[red]Error reading {file_path.name}: {exc}[/red]")
 
     return "\n".join(context_parts)
 
@@ -571,7 +591,7 @@ async def execute_task(
             todos = extract_todos_from_text(response_text)
             if todos:
                 console.print()
-                console.print(render_todos_panel(todos))
+                console.print(render_todos_panel(todos, max_completed=3))
                 console.print()
     else:
         response_text = await _invoke_agent(agent, final_input)
@@ -588,7 +608,7 @@ async def execute_task(
             todos = extract_todos_from_text(response_text)
             if todos:
                 console.print()
-                console.print(render_todos_panel(todos))
+                console.print(render_todos_panel(todos, max_completed=3))
             
             console.print()
 

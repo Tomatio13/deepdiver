@@ -46,7 +46,7 @@ def normalize_todos(todos: list[dict]) -> list[dict]:
     return output
 
 
-def render_todos_panel(todos: list[dict] | None = None) -> Panel:
+def render_todos_panel(todos: list[dict] | None = None, max_completed: int = 5) -> Panel:
     """Render a todos list as a Rich Panel.
     
     Args:
@@ -54,6 +54,7 @@ def render_todos_panel(todos: list[dict] | None = None) -> Panel:
             - 'content': Task description
             - 'status': "pending", "in_progress", "done", or "completed"
             - 'activeForm': (optional) Active form of the task
+        max_completed: Maximum number of completed tasks to show (default: 5)
             
     Returns:
         Panel with formatted todos table
@@ -63,11 +64,43 @@ def render_todos_panel(todos: list[dict] | None = None) -> Panel:
     
     todos = normalize_todos(todos)
     
+    # Separate completed and active tasks
+    completed_indices = []
+    active_indices = []
+    
+    for idx, item in enumerate(todos):
+        status = item.get("status", "pending")
+        if status == "done": 
+            status = "completed"
+        
+        if status == "completed":
+            completed_indices.append(idx)
+        else:
+            active_indices.append(idx)
+            
+    # Determine which completed tasks to hide
+    hidden_count = 0
+    show_indices = set(active_indices)
+    
+    if len(completed_indices) > max_completed:
+        hidden_count = len(completed_indices) - max_completed
+        # Show only the last max_completed items
+        show_indices.update(completed_indices[-max_completed:])
+    else:
+        show_indices.update(completed_indices)
+        
     table = Table.grid(padding=(0, 1))
     table.add_column(justify="right", width=3, no_wrap=True)
     table.add_column()
     
+    # Add hidden tasks summary if needed
+    if hidden_count > 0:
+        table.add_row("", Text(f"... {hidden_count} completed tasks hidden ...", style="dim italic"))
+    
     for idx, item in enumerate(todos, 1):
+        if (idx - 1) not in show_indices:
+            continue
+            
         status = item.get("status", "pending")
         # Map "done" to "completed" for display
         if status == "done":

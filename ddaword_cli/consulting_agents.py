@@ -13,7 +13,7 @@ from strands import Agent
 from strands_tools import editor, environment, file_read, file_write, http_request, shell,calculator,current_time
 from .csv_tool import filter_csv_data
 
-from .config import create_model
+from .config import create_model, console
 from .consulting_prompts import CONSULTING_PROMPTS
 from .consulting_state import (
     get_project_dir,
@@ -144,11 +144,12 @@ async def generate_project_name(analysis_focus: str) -> str:
     return project_name
 
 
-def _read_csv_with_encoding(csv_path: Path) -> pd.DataFrame:
+def _read_csv_with_encoding(csv_path: Path, nrows: int | None = None) -> pd.DataFrame:
     """エンコーディングを自動検出してCSVファイルを読み込む。
     
     Args:
         csv_path: CSVファイルのパス
+        nrows: 読み込む行数（Noneの場合は全行）
         
     Returns:
         読み込んだDataFrame
@@ -165,7 +166,7 @@ def _read_csv_with_encoding(csv_path: Path) -> pd.DataFrame:
     
     for encoding in encodings:
         try:
-            df = pd.read_csv(csv_path, encoding=encoding)
+            df = pd.read_csv(csv_path, encoding=encoding, nrows=nrows)
             return df
         except UnicodeDecodeError:
             continue
@@ -216,13 +217,26 @@ async def generate_hypotheses(
             if not csv_file.exists():
                 raise FileNotFoundError(f"CSVファイルが見つかりません: {csv_path}")
             
-            df = _read_csv_with_encoding(csv_file)
+            # コンテキスト生成用なので、先頭5行だけ読み込む（メモリ節約・高速化）
+            df = _read_csv_with_encoding(csv_file, nrows=5)
+            
+            # 総行数を取得するために、メタデータのみ別途取得（必要であれば）
+            # ここでは簡易的にファイルサイズ等から推測するか、
+            # 正確な行数が必要なら別途カウントするが、
+            # コンテキスト用としては「データの中身」が重要なので5行で十分。
+            # ただし、総行数の表示があった方が親切なので、行数カウントだけ行う。
+            try:
+                with open(csv_file, 'rb') as f:
+                    total_lines = sum(1 for _ in f) - 1 # ヘッダー分減らす（概算）
+            except Exception:
+                total_lines = "不明"
+
             dfs.append(df)
             
             # 各ファイルのデータ概要を生成
             file_summary = f"""
 ## ファイル: {csv_file.name}
-- 総行数: {len(df)}
+- 推定総行数: {total_lines}
 - カラム: {', '.join(df.columns.tolist())}
 - サンプルデータ（最初の5行）:
 {df.head(5).to_string()}
@@ -488,43 +502,48 @@ async def process_data_for_validation(
         # 各タスクを順に処理（仮説ごとに独立したエージェントを作成）
         processed_outputs = []
         
-        for hypothesis_id in pending_tasks:
-            try:
-                # タスクステータスをin_progressに更新
-                update_process_data_task_status(project_name, hypothesis_id, "in_progress")
+        if pending_tasks:
+            console.print(f"\n[bold cyan]Starting data processing for {len(pending_tasks)} hypotheses...[/bold cyan]")
+            
+            for hypothesis_id in pending_tasks:
+                console.print(f"[cyan]Processing {hypothesis_id}...[/cyan]")
                 
-                # 該当仮説のセクションを抽出
-                hypothesis_section = extract_hypothesis_section(hypotheses_content, hypothesis_id)
-                
-                if not hypothesis_section:
-                    # 仮説セクションが見つからない場合は、仮説IDを含む行を探す
-                    lines = hypotheses_content.split('\n')
-                    for i, line in enumerate(lines):
-                        if re.search(rf'\b{re.escape(hypothesis_id)}\b', line, re.IGNORECASE):
-                            # 次の数行を含める
-                            hypothesis_section = '\n'.join(lines[max(0, i-2):min(len(lines), i+20)])
-                            break
-                
-                # 仮説ごとに独立したサブエージェントを作成
-                agent = _create_consulting_agent("data_processor", model)
-                
-                # CSVファイル情報を最小限の形式で構築
-                csv_summary_lines = []
-                csv_path_list = []
-                for info in csv_info:
-                    csv_path_list.append(info['path'])
-                    if "error" in info:
-                        csv_summary_lines.append(f"- **{info['name']}** (`{info['path']}`): 読み込みエラー ({info['error']})")
-                    else:
-                        columns_str = ", ".join(info['columns'][:15])
-                        if len(info['columns']) > 15:
-                            columns_str += f", ... (計{len(info['columns'])}列)"
-                        csv_summary_lines.append(f"- **{info['name']}** (`{info['path']}`): {len(info['columns'])}列 - {columns_str}")
-                csv_summary_text = "\n".join(csv_summary_lines)
-                csv_paths_text = "\n".join([f"- `{path}`" for path in csv_path_list])
-                
-                # プロンプト構築（1つの仮説のみ、最小限の情報）
-                prompt = f"""
+                try:
+                    # タスクステータスをin_progressに更新
+                    update_process_data_task_status(project_name, hypothesis_id, "in_progress")
+                    
+                    # 該当仮説のセクションを抽出
+                    hypothesis_section = extract_hypothesis_section(hypotheses_content, hypothesis_id)
+                    
+                    if not hypothesis_section:
+                        # 仮説セクションが見つからない場合は、仮説IDを含む行を探す
+                        lines = hypotheses_content.split('\n')
+                        for i, line in enumerate(lines):
+                            if re.search(rf'\b{re.escape(hypothesis_id)}\b', line, re.IGNORECASE):
+                                # 次の数行を含める
+                                hypothesis_section = '\n'.join(lines[max(0, i-2):min(len(lines), i+20)])
+                                break
+                    
+                    # 仮説ごとに独立したサブエージェントを作成
+                    agent = _create_consulting_agent("data_processor", model)
+                    
+                    # CSVファイル情報を最小限の形式で構築
+                    csv_summary_lines = []
+                    csv_path_list = []
+                    for info in csv_info:
+                        csv_path_list.append(info['path'])
+                        if "error" in info:
+                            csv_summary_lines.append(f"- **{info['name']}** (`{info['path']}`): 読み込みエラー ({info['error']})")
+                        else:
+                            columns_str = ", ".join(info['columns'][:15])
+                            if len(info['columns']) > 15:
+                                columns_str += f", ... (計{len(info['columns'])}列)"
+                            csv_summary_lines.append(f"- **{info['name']}** (`{info['path']}`): {len(info['columns'])}列 - {columns_str}")
+                    csv_summary_text = "\n".join(csv_summary_lines)
+                    csv_paths_text = "\n".join([f"- `{path}`" for path in csv_path_list])
+                    
+                    # プロンプト構築（1つの仮説のみ、最小限の情報）
+                    prompt = f"""
 ## 仮説: {hypothesis_id}
 
 {hypothesis_section}
@@ -549,37 +568,37 @@ Pythonのコードは、このプロジェクトディレクトリ内で作成�
 
 上記の仮説 {hypothesis_id} を検証するために必要なデータを抽出・加工してください。
 """
-                
-                # サブエージェント呼び出し（独立したコンテキスト）
-                response_text = await _invoke_agent_async(agent, prompt)
-                
-                # 個別ファイルに保存
-                output_file = f"processed_data_{hypothesis_id}.md"
-                output_path = project_dir / output_file
-                output_path.write_text(response_text)
-                
-                # タスクステータスを完了に更新
-                update_process_data_task_status(
-                    project_name,
-                    hypothesis_id,
-                    "completed",
-                    output_file=output_file,
-                )
-                
-                processed_outputs.append(f"# {hypothesis_id}\n\n{response_text}\n\n")
-                
-            except Exception as e:
-                # タスクステータスを失敗に更新
-                error_msg = str(e)
-                update_process_data_task_status(
-                    project_name,
-                    hypothesis_id,
-                    "failed",
-                    error=error_msg,
-                )
-                state["errors"] = state.get("errors", [])
-                state["errors"].append(f"仮説 {hypothesis_id} のデータ加工に失敗しました: {e}")
-                # エラーが発生しても次のタスクを続行
+                    
+                    # サブエージェント呼び出し（独立したコンテキスト）
+                    response_text = await _invoke_agent_async(agent, prompt)
+                    
+                    # 個別ファイルに保存
+                    output_file = f"processed_data_{hypothesis_id}.md"
+                    output_path = project_dir / output_file
+                    output_path.write_text(response_text)
+                    
+                    # タスクステータスを完了に更新
+                    update_process_data_task_status(
+                        project_name,
+                        hypothesis_id,
+                        "completed",
+                        output_file=output_file,
+                    )
+                    
+                    processed_outputs.append(f"# {hypothesis_id}\n\n{response_text}\n\n")
+                    
+                except Exception as e:
+                    # タスクステータスを失敗に更新
+                    error_msg = str(e)
+                    update_process_data_task_status(
+                        project_name,
+                        hypothesis_id,
+                        "failed",
+                        error=error_msg,
+                    )
+                    state["errors"] = state.get("errors", [])
+                    state["errors"].append(f"仮説 {hypothesis_id} のデータ加工に失敗しました: {e}")
+                    # エラーが発生しても次のタスクを続行
         
         # 統合ファイルを作成
         if processed_outputs:
