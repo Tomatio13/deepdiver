@@ -26,7 +26,7 @@ from .consulting_state import (
 # モデルキャッシュ
 _cached_model: Any = None
 
-DEFAULT_TOOLS = [file_read, file_write, editor, shell, http_request, environment,calculator,current_time, filter_csv_data]
+DEFAULT_TOOLS = [file_read, file_write, editor, shell, http_request, environment,calculator,current_time]
 
 def _get_model():
     """モデルインスタンスを取得（キャッシュを使用）。"""
@@ -287,9 +287,15 @@ async def generate_hypotheses(
         
         agent = _create_consulting_agent("hypothesis_generator", model)
         
+        # CSVファイルパスをフォーマット
+        csv_paths_formatted = "\n".join([f"- `{path}`" for path in csv_paths])
+        
         # プロンプト構築
         prompt = f"""
         {data_summary}
+
+        ## CSVファイルのパス
+        {csv_paths_formatted}
 
         上記のデータを分析し、経営課題の仮説を生成してください。
         Markdown形式で出力し、各仮説にはID、タイトル、説明、優先度を含めてください。
@@ -423,15 +429,13 @@ async def process_data_for_validation(
             
             return state
         
-        # エージェント作成
+        # モデルを取得（各エージェントで共有）
         model = _get_model()
         if model is None:
             raise ValueError(
                 "LLMモデルが設定されていません。"
                 "STRANDS_MODEL_PROVIDER環境変数を設定してください。"
             )
-        
-        agent = _create_consulting_agent("data_processor", model)
         
         feedback_entries = state.get("steps", {}).get("process_data", {}).get("feedback", [])
         feedback_section = ""
@@ -448,8 +452,8 @@ async def process_data_for_validation(
                 lines.append(f"{prefix}{reason}")
             feedback_section = "\n## レビューコメント\n" + "\n".join(lines) + "\n"
 
-        # CSVファイルの概要を取得（コンテキスト節約のため）
-        csv_summary = []
+        # CSVファイルの最小限の情報のみを取得（コンテキスト節約）
+        csv_info = []
         for csv_path in csv_paths:
             csv_file = Path(csv_path)
             if not csv_file.is_absolute():
@@ -457,14 +461,31 @@ async def process_data_for_validation(
             
             if csv_file.exists():
                 try:
-                    df = _read_csv_with_encoding(csv_file)
-                    csv_summary.append(f"- {csv_file.name}: {len(df)}行, {len(df.columns)}列 ({', '.join(df.columns.tolist()[:5])}...)")
-                except Exception as e:
-                    csv_summary.append(f"- {csv_file.name}: 読み込みエラー ({e})")
+                    # カラム名のみを取得（データは読み込まない）
+                    df_sample = pd.read_csv(csv_file, encoding="utf-8", nrows=0)
+                    csv_info.append({
+                        "path": str(csv_file),
+                        "name": csv_file.name,
+                        "columns": df_sample.columns.tolist()
+                    })
+                except Exception:
+                    # UTF-8で失敗した場合は他のエンコーディングを試す
+                    try:
+                        df_sample = pd.read_csv(csv_file, encoding="shift-jis", nrows=0)
+                        csv_info.append({
+                            "path": str(csv_file),
+                            "name": csv_file.name,
+                            "columns": df_sample.columns.tolist()
+                        })
+                    except Exception as e:
+                        csv_info.append({
+                            "path": str(csv_file),
+                            "name": csv_file.name,
+                            "columns": [],
+                            "error": str(e)
+                        })
         
-        csv_summary_text = "\n".join(csv_summary)
-        
-        # 各タスクを順に処理
+        # 各タスクを順に処理（仮説ごとに独立したエージェントを作成）
         processed_outputs = []
         
         for hypothesis_id in pending_tasks:
@@ -484,28 +505,52 @@ async def process_data_for_validation(
                             hypothesis_section = '\n'.join(lines[max(0, i-2):min(len(lines), i+20)])
                             break
                 
-                # プロンプト構築（1つの仮説のみ）
+                # 仮説ごとに独立したサブエージェントを作成
+                agent = _create_consulting_agent("data_processor", model)
+                
+                # CSVファイル情報を最小限の形式で構築
+                csv_summary_lines = []
+                csv_path_list = []
+                for info in csv_info:
+                    csv_path_list.append(info['path'])
+                    if "error" in info:
+                        csv_summary_lines.append(f"- **{info['name']}** (`{info['path']}`): 読み込みエラー ({info['error']})")
+                    else:
+                        columns_str = ", ".join(info['columns'][:15])
+                        if len(info['columns']) > 15:
+                            columns_str += f", ... (計{len(info['columns'])}列)"
+                        csv_summary_lines.append(f"- **{info['name']}** (`{info['path']}`): {len(info['columns'])}列 - {columns_str}")
+                csv_summary_text = "\n".join(csv_summary_lines)
+                csv_paths_text = "\n".join([f"- `{path}`" for path in csv_path_list])
+                
+                # プロンプト構築（1つの仮説のみ、最小限の情報）
                 prompt = f"""
 ## 仮説: {hypothesis_id}
 
 {hypothesis_section}
 
-## CSVファイル一覧
+## 利用可能なCSVファイル
+{csv_paths_text}
+
+## CSVファイルのカラム情報
 {csv_summary_text}
 
 {feedback_section}
 
 上記の仮説 {hypothesis_id} を検証するために必要なデータを抽出・加工してください。
+⚠️ 重要な制約:
+- データ抽出するためのPythonコードを設計して、生成してファイルに保存してください。
+- 保存したPythonコードを実行して、データを抽出してください。 (⚠️ 重要な制約: CSVファイルを直接読み込まないでください)
+- 抽出したデータを集計・計算・可視化（matplotlib）用のデータを準備する（tidy/long形式を推奨）
 
 ## プロジェクトディレクトリ
 Pythonのコードは、このプロジェクトディレクトリ内で作成・実行してください。
 {project_dir}
 
-複数のCSVファイルがある場合は、ファイル間の関連性も考慮してください。
-Markdown形式で出力し、抽出したデータの概要、集計結果、データの特徴を含めてください。
+上記の仮説 {hypothesis_id} を検証するために必要なデータを抽出・加工してください。
 """
                 
-                # エージェント呼び出し
+                # サブエージェント呼び出し（独立したコンテキスト）
                 response_text = await _invoke_agent_async(agent, prompt)
                 
                 # 個別ファイルに保存
