@@ -617,8 +617,8 @@ requires-dist = [
     { name = "python-dotenv" },
     { name = "requests" },
     { name = "rich", specifier = ">=13.0.0" },
-    { name = "strands-agents", specifier = ">=0.2.0" },
-    { name = "strands-agents-tools", specifier = ">=0.2.0" },
+    { name = "strands-agents", specifier = ">=1.17.0" },
+    { name = "strands-agents-tools", specifier = ">=0.2.16" },
     { name = "tabulate", specifier = ">=0.9.0" },
 ]
 
@@ -2400,7 +2400,7 @@ wheels = [
 
 [[package]]
 name = "strands-agents"
-version = "1.15.0"
+version = "1.17.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "boto3" },
@@ -2415,14 +2415,14 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "watchdog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/04/14/fee14885617d82fe6d0dc8475426fd1293632718604a97fbe070e50446c1/strands_agents-1.15.0.tar.gz", hash = "sha256:bc02d80d2ccd4964a41b26ca40eb9af35893623d2db2266eb578112374ca287a", size = 502556 }
+sdist = { url = "https://files.pythonhosted.org/packages/89/c4/925da2e52279e53067c1306ce1b116bd0cee334ddee751a207b05ad0e668/strands_agents-1.17.0.tar.gz", hash = "sha256:60b0006f2d60534761a468aa15916f0ec7670952ce32c829d4f91bc3a243dfec", size = 514561 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/97/0a/a551440b6184b883582f90491e86981a6d44df9cc9e45e36c0dcb04c9789/strands_agents-1.15.0-py3-none-any.whl", hash = "sha256:0c24b568dbecf1c68952ca6f44730ab95a82f5d00cd17bf4569450eae1325711", size = 249686 },
+    { url = "https://files.pythonhosted.org/packages/07/fb/2d9f15af01dbd4854fbaf68bf8c41b23359878182639f3686c555189964b/strands_agents-1.17.0-py3-none-any.whl", hash = "sha256:8b8412048a3ca3568a9f7253de0d2c931e36149cee2b9ca7b823cce51d64e36d", size = 253993 },
 ]
 
 [[package]]
 name = "strands-agents-tools"
-version = "0.2.14"
+version = "0.2.16"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2443,9 +2443,9 @@ dependencies = [
     { name = "tzdata", marker = "sys_platform == 'win32'" },
     { name = "watchdog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d5/46/f7988fdb470ec991e6a84a08a293a7041379b12c61df13d2e4daf624a6bd/strands_agents_tools-0.2.14.tar.gz", hash = "sha256:233193b8cb48b4d6f83f7ee827d33b6e5e7e75c28e84e86ecf016823092a860a", size = 452270 }
+sdist = { url = "https://files.pythonhosted.org/packages/dd/1c/3b471a94088407383fe6a20d73c356647c563b6605585c34c8a4e35cfc4f/strands_agents_tools-0.2.16.tar.gz", hash = "sha256:ba7d91656923508b74518cf292531acec3ed3809b6674fb3e6e419908574fa1e", size = 470535 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a2/c1/17a99b1b9bc94651752b5781b81e96cd6efc39f089410696edfdedade3f7/strands_agents_tools-0.2.14-py3-none-any.whl", hash = "sha256:7b44fa62c0e81b0353b52c23f01c5d0d487034ae6caadbd8d9138d35008147e8", size = 300480 },
+    { url = "https://files.pythonhosted.org/packages/12/cd/b94d16e971102dce88ba62a68b93ceac867ffbf37e1ee297036e0c83a04e/strands_agents_tools-0.2.16-py3-none-any.whl", hash = "sha256:c9e78357d7f05f8935ff366f14e3cf27817b5f037cb5af1ae8ab8e91d0ab60f4", size = 311497 },
 ]
 
 [[package]]

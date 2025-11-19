@@ -127,19 +127,19 @@ async def simple_cli(agent, assistant_id: str | None, session_state):
         except KeyboardInterrupt:
             # Ctrl+C at prompt - exit the program
             console.print("\nGoodbye!", style=COLORS["primary"])
-            # Force immediate exit without waiting for cleanup
-            os._exit(0)
+            # Return to allow cleanup
+            return
 
         if not user_input:
             continue
 
         # Check for slash commands first
         if user_input.startswith("/"):
-            result = handle_command(user_input, assistant_id)
+            result = await handle_command(user_input, assistant_id)
             if result == "exit":
                 console.print("\nGoodbye!", style=COLORS["primary"])
-                # Force immediate exit without waiting for cleanup
-                os._exit(0)
+                # Return to allow cleanup
+                return
             if result:
                 # Command was handled, continue to next input
                 continue
@@ -152,8 +152,8 @@ async def simple_cli(agent, assistant_id: str | None, session_state):
         # Handle regular quit keywords
         if user_input.lower() in ["quit", "exit", "q"]:
             console.print("\nGoodbye!", style=COLORS["primary"])
-            # Force immediate exit without waiting for cleanup
-            os._exit(0)
+            # Return to allow cleanup
+            return
 
         await execute_task(user_input, agent, assistant_id, session_state)
 
@@ -202,6 +202,14 @@ async def main(assistant_id: str, session_state):
         await simple_cli(agent, assistant_id, session_state)
     except Exception as e:
         console.print(f"\n[bold red]❌ Error:[/bold red] {e}\n")
+    finally:
+        # Cleanup resources
+        from .consulting_agents import close_model
+        await close_model()
+        
+        # Close the main model if it has a client
+        if model and hasattr(model, "client") and hasattr(model.client, "aclose"):
+            await model.client.aclose()
 
 
 def cli_main():

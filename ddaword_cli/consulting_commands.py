@@ -29,36 +29,10 @@ from .consulting_agents import (
 )
 
 
-def _run_async(coro):
-    """非同期関数を同期的に実行するヘルパー関数。
-    
-    既存のイベントループが実行中の場合は、新しいループを別スレッドで実行します。
-    """
-    try:
-        asyncio.get_running_loop()
-        # 既存のループが実行中の場合は、新しいループを別スレッドで実行
-        import concurrent.futures
-        
-        def run_in_new_loop():
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            try:
-                task = new_loop.create_task(coro)
-                result = new_loop.run_until_complete(task)
-                new_loop.run_until_complete(new_loop.shutdown_asyncgens())
-                return result
-            finally:
-                new_loop.close()
-        
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(run_in_new_loop)
-            return future.result(timeout=300)  # 5分のタイムアウト
-    except RuntimeError:
-        # イベントループが実行中でない場合は通常通り実行
-        return asyncio.run(coro)
 
 
-def handle_consulting_command(command: str, assistant_id: str = "agent") -> bool:
+
+async def handle_consulting_command(command: str, assistant_id: str = "agent") -> bool:
     """経営コンサルコマンドを処理。
     
     Args:
@@ -140,24 +114,7 @@ def handle_consulting_command(command: str, assistant_id: str = "agent") -> bool
         from .consulting_agents import generate_project_name
         
         try:
-            # 新しいイベントループで実行（既存のループと干渉しないように）
-            import concurrent.futures
-            import threading
-            
-            def run_in_new_loop():
-                new_loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(new_loop)
-                try:
-                    task = new_loop.create_task(generate_project_name(analysis_focus))
-                    result = new_loop.run_until_complete(task)
-                    new_loop.run_until_complete(new_loop.shutdown_asyncgens())
-                    return result
-                finally:
-                    new_loop.close()
-            
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(run_in_new_loop)
-                project_name = future.result(timeout=30)
+            project_name = await generate_project_name(analysis_focus)
         except Exception as e:
             console.print(f"[yellow]警告: プロジェクト名生成に失敗しました。デフォルト名を使用します: {e}[/yellow]")
             # フォールバック: analysis_focusから簡易的に生成
@@ -229,7 +186,7 @@ def handle_consulting_command(command: str, assistant_id: str = "agent") -> bool
         console.print("[dim]仮説を生成中...[/dim]")
         
         try:
-            state = _run_async(generate_hypotheses(state, project_name))
+            state = await generate_hypotheses(state, project_name)
         except Exception as e:
             console.print(f"[red]エラー: 仮説生成中にエラーが発生しました: {e}[/red]")
             console.print()
@@ -316,7 +273,7 @@ def handle_consulting_command(command: str, assistant_id: str = "agent") -> bool
         console.print("[dim]データを整理・加工中...[/dim]")
         
         try:
-            state = _run_async(process_data_for_validation(state, project_name))
+            state = await process_data_for_validation(state, project_name)
         except Exception as e:
             console.print(f"[red]エラー: データ加工中にエラーが発生しました: {e}[/red]")
             console.print()
@@ -388,7 +345,7 @@ def handle_consulting_command(command: str, assistant_id: str = "agent") -> bool
         console.print("[dim]仮説を検証中...[/dim]")
         
         try:
-            state = _run_async(validate_hypotheses(state, project_name))
+            state = await validate_hypotheses(state, project_name)
         except Exception as e:
             console.print(f"[red]エラー: 仮説検証中にエラーが発生しました: {e}[/red]")
             console.print()
@@ -446,7 +403,7 @@ def handle_consulting_command(command: str, assistant_id: str = "agent") -> bool
         console.print("[dim]戦略を立案中...[/dim]")
         
         try:
-            state = _run_async(plan_strategies(state, project_name))
+            state = await plan_strategies(state, project_name)
         except Exception as e:
             console.print(f"[red]エラー: 戦略立案中にエラーが発生しました: {e}[/red]")
             console.print()
@@ -504,7 +461,7 @@ def handle_consulting_command(command: str, assistant_id: str = "agent") -> bool
         console.print("[dim]レポートを生成中...[/dim]")
         
         try:
-            state = _run_async(generate_consulting_report(state, project_name))
+            state = await generate_consulting_report(state, project_name)
         except Exception as e:
             console.print(f"[red]エラー: レポート生成中にエラーが発生しました: {e}[/red]")
             console.print()

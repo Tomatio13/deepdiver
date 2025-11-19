@@ -9,7 +9,7 @@ from .mcp_tools import get_mcp_server_info
 from .ui import show_interactive_help, toast
 
 
-def handle_command(command: str, assistant_id: str = "agent") -> str | bool:
+async def handle_command(command: str, assistant_id: str = "agent") -> str | bool:
     """Handle slash commands. Returns 'exit' to exit, True if handled, False to pass to agent."""
     stripped_command = command.strip().lstrip("/")
     cmd_lower = stripped_command.lower()
@@ -85,9 +85,13 @@ def handle_command(command: str, assistant_id: str = "agent") -> str | bool:
         console.print()
         return True
 
+    if cmd_lower == "status":
+        from .consulting_commands import handle_consulting_command
+        return await handle_consulting_command("consulting:status", assistant_id)
+
     if cmd_lower.startswith("consulting:"):
         from .consulting_commands import handle_consulting_command
-        return handle_consulting_command(stripped_command, assistant_id)
+        return await handle_consulting_command(stripped_command, assistant_id)
 
     toast(f"Unknown command: /{cmd_lower}\nType /help for available commands.", kind="warning")
     console.print()

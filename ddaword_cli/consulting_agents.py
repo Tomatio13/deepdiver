@@ -36,6 +36,20 @@ def _get_model():
     return _cached_model
 
 
+async def close_model():
+    """キャッシュされたモデルのリソースを解放する。"""
+    global _cached_model
+    if _cached_model:
+        # モデルがclient属性を持っていて、それがacloseメソッドを持っている場合
+        if hasattr(_cached_model, "client") and hasattr(_cached_model.client, "aclose"):
+            await _cached_model.client.aclose()
+        # 同期closeの場合
+        elif hasattr(_cached_model, "client") and hasattr(_cached_model.client, "close"):
+            _cached_model.client.close()
+            
+        _cached_model = None
+
+
 def _create_consulting_agent(agent_type: str, model: Any) -> Agent:
     """指定されたタイプのコンサルティングエージェントを作成。
     
