@@ -130,3 +130,6 @@ if "result" in event:
 4. **ライフサイクルイベント**: 必要に応じて`init_event_loop`、`start_event_loop`、`force_stop`などを処理
 
 
+
+
+

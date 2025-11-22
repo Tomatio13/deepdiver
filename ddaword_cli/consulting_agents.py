@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+import dotenv
 import pandas as pd
 from strands import Agent
 from strands_tools import editor, environment, file_read, file_write, http_request, shell,calculator,current_time
@@ -60,6 +61,9 @@ def _create_consulting_agent(agent_type: str, model: Any) -> Agent:
     Returns:
         エージェントインスタンス
     """
+    # .envファイルから環境変数を読み込む
+    dotenv.load_dotenv()
+    
     prompt = CONSULTING_PROMPTS.get(agent_type, "")
     return Agent(
         model=model,
