@@ -13,10 +13,7 @@
 
 ---
 
-## 2. なぜ FUJITSU DDM-AWord  CLI なのか？
-
-
-
+## 2. なぜ FUJITSU DDM-AWord  CLI なのか
 
 多くのAIツールは「ユーザーの質問に答える」あるいは「指示されたコードを書く」ことに留まっています。しかし、FUJITSU DDM-AWord  CLI は以下の点で根本的に異なります。
 

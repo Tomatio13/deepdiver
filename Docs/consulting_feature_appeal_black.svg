@@ -104,11 +104,11 @@
     </g>
 
     <!-- Human in the Loop Badge -->
-    <g transform="translate(920, 60)">
-        <rect x="0" y="0" width="220" height="80" rx="8" fill="#CC7A00" /> <!-- Darker Orange for better contrast if needed, but standard orange is fine. Using slightly muted orange. -->
-        <text x="110" y="30" text-anchor="middle" class="highlight-text" font-size="16">Human-in-the-Loop</text>
-        <text x="110" y="60" text-anchor="middle" class="highlight-text" font-size="14">各ステップで人間の承認を経て</text>
-        <text x="110" y="75" text-anchor="middle" class="highlight-text" font-size="14">ハルシネーションを防止</text>
+    <g transform="translate(900, 60)">
+        <rect x="0" y="0" width="260" height="80" rx="8" fill="#CC7A00" /> <!-- Darker Orange for better contrast if needed, but standard orange is fine. Using slightly muted orange. -->
+        <text x="130" y="30" text-anchor="middle" class="highlight-text" font-size="16">Human-in-the-Loop</text>
+        <text x="130" y="60" text-anchor="middle" class="highlight-text" font-size="14">各ステップで人間の承認を経て</text>
+        <text x="130" y="75" text-anchor="middle" class="highlight-text" font-size="14">ハルシネーションを防止</text>
     </g>
   </g>
 

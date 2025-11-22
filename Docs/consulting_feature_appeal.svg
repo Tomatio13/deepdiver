@@ -7,7 +7,7 @@
       .section-title { font-family: 'Noto Sans JP', sans-serif; font-weight: 700; font-size: 28px; fill: #004CC4; }
       .card-title { font-family: 'Noto Sans JP', sans-serif; font-weight: 700; font-size: 20px; fill: #333333; }
       .card-text { font-family: 'Noto Sans JP', sans-serif; font-weight: 400; font-size: 16px; fill: #666666; }
-      .step-num { font-family: 'Noto Sans JP', sans-serif; font-weight: 700; font-size: 32px; fill: #E0E0E0; }
+      .step-num { font-family: 'Noto Sans JP', sans-serif; font-weight: 700; font-size: 32px; fill: #000000:}
       .highlight-text { font-family: 'Noto Sans JP', sans-serif; font-weight: 700; font-size: 18px; fill: #FFFFFF; }
     </style>
     <!-- Arrow Marker -->
@@ -103,11 +103,11 @@
     </g>
 
     <!-- Human in the Loop Badge -->
-    <g transform="translate(920, 60)">
-        <rect x="0" y="0" width="220" height="80" rx="8" fill="#FF9900" />
-        <text x="110" y="30" text-anchor="middle" class="highlight-text" font-size="16">Human-in-the-Loop</text>
-        <text x="110" y="60" text-anchor="middle" class="highlight-text" font-size="14">各ステップで人間の承認を経て</text>
-        <text x="110" y="75" text-anchor="middle" class="highlight-text" font-size="14">ハルシネーションを防止</text>
+    <g transform="translate(900, 60)">
+        <rect x="0" y="0" width="260" height="80" rx="8" fill="#FF9900" />
+        <text x="130" y="30" text-anchor="middle" class="highlight-text" font-size="16">Human-in-the-Loop</text>
+        <text x="130" y="60" text-anchor="middle" class="highlight-text" font-size="14">各ステップで人間の承認を経て</text>
+        <text x="130" y="75" text-anchor="middle" class="highlight-text" font-size="14">ハルシネーションを防止</text>
     </g>
   </g>
 
