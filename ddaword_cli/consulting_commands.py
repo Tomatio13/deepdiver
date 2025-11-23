@@ -279,11 +279,18 @@ async def handle_consulting_command(command: str, assistant_id: str = "agent") -
             console.print()
             return True
         
-        # エラーチェック
+        # エラーチェック（エラーがあっても成果物があれば保存を試みる）
         if state.get("errors"):
-            console.print(f"[red]エラー: {state['errors'][-1]}[/red]")
+            console.print(f"[yellow]警告: 処理中に以下のエラーが発生しました:[/yellow]")
+            for error in state["errors"]:
+                console.print(f"[red]  - {error}[/red]")
             console.print()
-            return True
+            
+            # 成果物がない場合はここで終了
+            if not state.get("processed_data_markdown"):
+                return True
+            
+            console.print("[yellow]一部の処理に失敗しましたが、生成されたデータを保存します。[/yellow]")
         
         # Markdownファイルに保存（統合ファイル）
         project_dir = get_project_dir(project_name)
@@ -469,9 +476,16 @@ async def handle_consulting_command(command: str, assistant_id: str = "agent") -
         
         # エラーチェック
         if state.get("errors"):
-            console.print(f"[red]エラー: {state['errors'][-1]}[/red]")
+            console.print(f"[yellow]警告: 処理中に以下のエラーが発生しました:[/yellow]")
+            for error in state["errors"]:
+                console.print(f"[red]  - {error}[/red]")
             console.print()
-            return True
+            
+            # 成果物がない場合はここで終了
+            if not state.get("report_markdown"):
+                return True
+                
+            console.print("[yellow]エラーが発生しましたが、生成されたレポートを保存します。[/yellow]")
         
         # Markdownファイルに保存
         project_dir = get_project_dir(project_name)

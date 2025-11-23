@@ -8,14 +8,13 @@ import re
 from pathlib import Path
 from typing import Any
 
-import dotenv
 import pandas as pd
 from strands import Agent
 from strands_tools import editor, environment, file_read, file_write, http_request, shell,calculator,current_time
 from .csv_tool import filter_csv_data
 
 from .config import create_model, console
-from .consulting_prompts import CONSULTING_PROMPTS
+from .consulting_prompts import CONSULTING_PROMPTS, get_data_processing_prompt
 from .consulting_state import (
     get_project_dir,
     load_state,
@@ -560,40 +559,56 @@ async def process_data_for_validation(
                     csv_summary_text = "\n".join(csv_summary_lines)
                     csv_paths_text = "\n".join([f"- `{path}`" for path in csv_path_list])
                     
-                    # プロンプト構築（1つの仮説のみ、最小限の情報）
-                    prompt = f"""
-## 仮説: {hypothesis_id}
-
-{hypothesis_section}
-
-## 利用可能なCSVファイル
-{csv_paths_text}
-
-## CSVファイルのカラム情報
-{csv_summary_text}
-
-{feedback_section}
-
-上記の仮説 {hypothesis_id} を検証するために必要なデータを抽出・加工してください。
-⚠️ 重要な制約:
-- データ抽出するためのPythonコードを設計して、生成してファイルに保存してください。
-- 保存したPythonコードを実行して、データを抽出してください。 (⚠️ 重要な制約: CSVファイルを直接読み込まないでください)
-- 抽出したデータを集計・計算・可視化（matplotlib）用のデータを準備する（tidy/long形式を推奨）
-
-## プロジェクトディレクトリ
-Pythonのコードは、このプロジェクトディレクトリ内で作成・実行してください。
-{project_dir}
-
-上記の仮説 {hypothesis_id} を検証するために必要なデータを抽出・加工してください。
-"""
+                    # 再試行ループ（最大3回）
+                    max_retries = 3
+                    current_feedback = feedback_section
+                    final_response_text = ""
                     
-                    # サブエージェント呼び出し（独立したコンテキスト）
-                    response_text = await _invoke_agent_async(agent, prompt)
+                    for attempt in range(max_retries):
+                        is_last_attempt = (attempt == max_retries - 1)
+                        
+                        # プロンプト構築
+                        prompt = get_data_processing_prompt(
+                            hypothesis_id=hypothesis_id,
+                            hypothesis_section=hypothesis_section,
+                            csv_paths_text=csv_paths_text,
+                            csv_summary_text=csv_summary_text,
+                            feedback_section=current_feedback,
+                            project_dir=str(project_dir),
+                        )
+                        
+                        # サブエージェント呼び出し
+                        console.print(f"[cyan]  Attempt {attempt + 1}/{max_retries}...[/cyan]")
+                        response_text = await _invoke_agent_async(agent, prompt)
+                        
+                        # レビュー（自己検証）
+                        reviewer = _create_consulting_agent("data_processing_reviewer", model)
+                        review_prompt = f"""
+## レポート内容
+{response_text}
+
+上記のレポートをレビューしてください。
+"""
+                        review_result = await _invoke_agent_async(reviewer, review_prompt)
+                        
+                        if review_result.strip().startswith("OK"):
+                            console.print(f"[green]  Review passed![/green]")
+                            final_response_text = response_text
+                            break
+                        else:
+                            error_reason = review_result.replace("NG:", "").strip()
+                            console.print(f"[yellow]  Review failed: {error_reason}[/yellow]")
+                            
+                            if not is_last_attempt:
+                                current_feedback += f"\n\n## 品質レビューからのフィードバック（再試行 {attempt+1}回目）\n{error_reason}\n修正して再生成してください。\n"
+                            else:
+                                console.print("[red]  Max retries reached. Saving last result.[/red]")
+                                final_response_text = response_text
                     
                     # 個別ファイルに保存
                     output_file = f"processed_data_{hypothesis_id}.md"
                     output_path = project_dir / output_file
-                    output_path.write_text(response_text)
+                    output_path.write_text(final_response_text)
                     
                     # タスクステータスを完了に更新
                     update_process_data_task_status(
@@ -603,7 +618,7 @@ Pythonのコードは、このプロジェクトディレクトリ内で作成�
                         output_file=output_file,
                     )
                     
-                    processed_outputs.append(f"# {hypothesis_id}\n\n{response_text}\n\n")
+                    processed_outputs.append(f"# {hypothesis_id}\n\n{final_response_text}\n\n")
                     
                 except Exception as e:
                     # タスクステータスを失敗に更新
