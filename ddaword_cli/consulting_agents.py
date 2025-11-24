@@ -7,13 +7,13 @@ import json
 import re
 from pathlib import Path
 from typing import Any
-
+import os,dotenv
 import pandas as pd
 from strands import Agent
 from strands_tools import editor, environment, file_read, file_write, http_request, shell,calculator,current_time
 from .csv_tool import filter_csv_data
 
-from .config import create_model, console
+from .config import create_model, console, COLORS
 from .consulting_prompts import CONSULTING_PROMPTS, get_data_processing_prompt
 from .consulting_state import (
     get_project_dir,
