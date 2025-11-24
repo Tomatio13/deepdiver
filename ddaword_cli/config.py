@@ -18,9 +18,13 @@ COLORS = {
     "primary": "#00bfff",
     "dim": "#6b7280",
     "user": "#ffffff",
-    "agent": "#00bfff",
+    "agent": "#ffffff",
     "thinking": "#34d399",
     "tool": "#fbbf24",
+    "success": "#34d399",  # 緑系 - 成功メッセージ用
+    "warning": "#fbbf24",  # 黄色系 - 警告メッセージ用
+    "error": "#ef4444",    # 赤系 - エラーメッセージ用
+    "info": "#00bfff",     # シアン系 - 情報メッセージ用
 }
 
 # ASCII art banner

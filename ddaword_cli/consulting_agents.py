@@ -68,10 +68,73 @@ def _create_consulting_agent(agent_type: str, model: Any) -> Agent:
         model=model,
         system_prompt=prompt,
         tools=list(DEFAULT_TOOLS),
+        callback_handler=None,
     )
 
 
 async def _invoke_agent_async(agent: Agent, prompt: str) -> str:
+    """エージェントを非同期で呼び出し、ストリーミング表示と色付けを適用して結果を文字列で返す。"""
+    import sys
+    
+    # ストリーミングをサポートしているか確認
+    if hasattr(agent, "stream_async"):
+        response_buffer: list[str] = []
+        final_response = ""
+        
+        try:
+            async for event in agent.stream_async(prompt):
+                if not isinstance(event, dict):
+                    continue
+                
+                # モデルデルタをレンダリング（リアルタイム表示）
+                data = event.get("data")
+                if isinstance(data, str) and data:
+                    response_buffer.append(data)
+                    console.print(data, style=COLORS["agent"], end="")
+                    sys.stdout.flush()
+                    continue
+                
+                
+                # ツールイベントの表示
+                if "current_tool_use" in event and event["current_tool_use"].get("name"):
+                    tool_name = event["current_tool_use"]["name"]
+                    console.print()
+                    console.print(f"🔧 Using tool: {tool_name}")
+                    sys.stdout.flush()
+                
+                # 後方互換性のため、delta もチェック
+                delta = event.get("delta")
+                if isinstance(delta, str) and delta:
+                    response_buffer.append(delta)
+                    console.print(delta, style=COLORS["agent"], end="")
+                    sys.stdout.flush()
+                    continue
+                
+                # 最終結果の取得
+                if "result" in event:
+                    result = event.get("result")
+                    if result is not None:
+                        if hasattr(result, "output_text"):
+                            final_response = str(result.output_text)
+                        elif hasattr(result, "content"):
+                            final_response = str(result.content)
+                        elif isinstance(result, dict):
+                            final_response = str(result.get("output_text", result.get("content", result)))
+                        else:
+                            final_response = str(result)
+            
+            # 改行を追加
+            console.print()
+            
+            # 最終結果があればそれを使用、なければバッファから構築
+            combined = final_response or "".join(response_buffer)
+            return combined.strip()
+            
+        except Exception as exc:
+            # ストリーミングに失敗した場合は通常の呼び出しにフォールバック
+            console.print(f"\n[{COLORS['warning']}]Streaming failed, using blocking call: {exc}[/]")
+    
+    # ストリーミングをサポートしていない場合は通常の呼び出し
     """エージェントを非同期で呼び出し、結果を文字列で返す。"""
     if hasattr(agent, "invoke_async"):
         response = await agent.invoke_async(prompt)
@@ -217,6 +280,8 @@ async def generate_hypotheses(
             else:
                 raise ValueError("CSVファイルが指定されていません。")
         
+        project_dir = get_project_dir(project_name)
+        
         # デバッグ: 読み込むCSVファイルのリストを確認
         import logging
         logger = logging.getLogger(__name__)
@@ -285,8 +350,10 @@ async def generate_hypotheses(
 """
         
         feedback_entries = state.get("steps", {}).get("hypothesis", {}).get("feedback", [])
+        feedback_section = ""
         if feedback_entries:
             data_summary += "\n## レビューコメント\n"
+            lines = []
             for entry in feedback_entries[-5:]:
                 if isinstance(entry, dict):
                     timestamp = entry.get("timestamp", "")
@@ -295,18 +362,22 @@ async def generate_hypotheses(
                     timestamp = ""
                     reason = str(entry)
                 prefix = f"- ({timestamp}) " if timestamp else "- "
+                lines.append(f"{prefix}{reason}")
                 data_summary += f"{prefix}{reason}\n"
+            feedback_section = "\n## レビューコメント\n" + "\n".join(lines) + "\n"
 
         if state.get("analysis_focus"):
             data_summary += f"\n## 分析の焦点\n{state['analysis_focus']}\n"
         
         # 前回の検証結果がある場合は追加
-        if state.get("steps", {}).get("validate", {}).get("output_file"):
-            project_dir = get_project_dir(project_name)
-            validation_file = project_dir / state["steps"]["validate"]["output_file"]
-            if validation_file.exists():
-                validation_content = validation_file.read_text()
-                data_summary += f"\n## 前回の検証結果（参考）\n{validation_content[:1000]}...\n"
+        # 検証結果を取得
+        project_dir = get_project_dir(project_name)
+        validation_file_name = state["steps"]["validate"].get("output_file") or "validation_results.md"
+        validation_file = project_dir / validation_file_name
+        
+        if validation_file.exists():
+            validation_content = validation_file.read_text()
+            data_summary += f"\n## 前回の検証結果（参考）\n{validation_content[:1000]}...\n"
         
         # エージェント作成
         model = _get_model()
@@ -318,25 +389,127 @@ async def generate_hypotheses(
         
         agent = _create_consulting_agent("hypothesis_generator", model)
         
-        # CSVファイルパスをフォーマット
-        csv_paths_formatted = "\n".join([f"- `{path}`" for path in csv_paths])
+        # csv_infoを構築（process_data_for_validationと同様のロジック）
+        csv_info = []
+        for csv_path in csv_paths:
+            csv_file = Path(csv_path)
+            if not csv_file.is_absolute():
+                csv_file = Path.cwd() / csv_file
+            
+            if csv_file.exists():
+                try:
+                    # カラム名のみを取得（データは読み込まない）
+                    df_sample = pd.read_csv(csv_file, encoding="utf-8", nrows=0)
+                    csv_info.append({
+                        "path": str(csv_file),
+                        "name": csv_file.name,
+                        "columns": df_sample.columns.tolist()
+                    })
+                except Exception:
+                    # UTF-8で失敗した場合は他のエンコーディングを試す
+                    try:
+                        df_sample = pd.read_csv(csv_file, encoding="shift-jis", nrows=0)
+                        csv_info.append({
+                            "path": str(csv_file),
+                            "name": csv_file.name,
+                            "columns": df_sample.columns.tolist()
+                        })
+                    except Exception as e:
+                        csv_info.append({
+                            "path": str(csv_file),
+                            "name": csv_file.name,
+                            "columns": [],
+                            "error": str(e)
+                        })
         
-        # プロンプト構築
-        prompt = f"""
-        {data_summary}
+        # CSVファイル情報を最小限の形式で構築
+        csv_summary_lines = []
+        csv_path_list = []
+        for info in csv_info:
+            csv_path_list.append(info['path'])
+            if "error" in info:
+                csv_summary_lines.append(f"- **{info['name']}** (`{info['path']}`): 読み込みエラー ({info['error']})")
+            else:
+                columns_str = ", ".join(info['columns'][:15])
+                if len(info['columns']) > 15:
+                    columns_str += f", ... (計{len(info['columns'])}列)"
+                csv_summary_lines.append(f"- **{info['name']}** (`{info['path']}`): {len(info['columns'])}列 - {columns_str}")
+        csv_summary_text = "\n".join(csv_summary_lines)
+        csv_paths_text = "\n".join([f"- `{path}`" for path in csv_path_list])
 
-        ## CSVファイルのパス
-        {csv_paths_formatted}
+        # 関連ドキュメントの取得
+        docs_text = ""
+        if state.get("docs_paths"):
+            docs_content = []
+            for doc_path_str in state["docs_paths"]:
+                doc_path = Path(doc_path_str)
+                if doc_path.exists():
+                    docs_content.append(f"### {doc_path.name}\n```\n{doc_path.read_text()[:1000]}...\n```")
+            if docs_content:
+                docs_text = "\n## 関連ドキュメント\n" + "\n".join(docs_content) + "\n"
 
-        上記のデータを分析し、経営課題の仮説を生成してください。
-        Markdown形式で出力し、各仮説にはID、タイトル、説明、優先度を含めてください。
-        """
+        # 再試行ループ（最大3回）
+        max_retries = 3
+        current_feedback = feedback_section
+        final_response_text = ""
         
-        # エージェント呼び出し
-        response_text = await _invoke_agent_async(agent, prompt)
-        
-        # Markdownを保存
-        state["hypotheses_markdown"] = response_text
+        for attempt in range(max_retries):
+            is_last_attempt = (attempt == max_retries - 1)
+            
+            # プロンプト構築
+            prompt = f"""
+## プロジェクト: {project_name}
+
+## 利用可能なデータソース
+### CSVファイルパス
+{csv_paths_text}
+
+### カラム情報
+{csv_summary_text}
+
+## 関連ドキュメント
+{docs_text}
+
+{current_feedback}
+
+システムプロンプトの指示に従い、上記のデータから経営課題の仮説を立案してください。
+"""
+            
+            # エージェント呼び出し
+            console.print(f"[{COLORS['info']}]Generating hypotheses (Attempt {attempt + 1}/{max_retries})...[/]")
+            response_text = await _invoke_agent_async(agent, prompt)
+            
+            # レビュー（自己検証）
+            reviewer = _create_consulting_agent("hypothesis_reviewer", model)
+            review_prompt = f"""
+## 仮説リスト
+{response_text}
+
+上記の仮説リストをレビューしてください。
+**重要: 出力は必ず "OK" または "NG: <理由>" の形式のみにしてください。余計な挨拶や説明は不要です。**
+"""
+            review_result = await _invoke_agent_async(reviewer, review_prompt)
+            
+            if review_result.strip().startswith("OK"):
+                console.print(f"[{COLORS['success']}]  Review passed![/]")
+                final_response_text = response_text
+                break
+            else:
+                error_reason = review_result.replace("NG:", "").strip()
+                console.print(f"[{COLORS['warning']}]  Review failed: {error_reason}[/]")
+                
+                if not is_last_attempt:
+                    current_feedback += f"\n\n## 品質レビューからのフィードバック（再試行 {attempt+1}回目）\n{error_reason}\n修正して再生成してください。\n"
+                else:
+                    console.print(f"[{COLORS['error']}]  Max retries reached. Saving last result.[/]")
+                    final_response_text = response_text
+
+        # 結果を保存
+        # 結果を保存
+        state["hypotheses_markdown"] = final_response_text
+        output_file = state["steps"]["hypothesis"].get("output_file") or "hypotheses.md"
+        output_path = project_dir / output_file
+        output_path.write_text(final_response_text)
         
         return state
         
@@ -423,7 +596,8 @@ async def process_data_for_validation(
         
         # 仮説を取得
         project_dir = get_project_dir(project_name)
-        hypotheses_file = project_dir / state["steps"]["hypothesis"]["output_file"]
+        hypotheses_file_name = state["steps"]["hypothesis"].get("output_file") or "hypotheses.md"
+        hypotheses_file = project_dir / hypotheses_file_name
         if not hypotheses_file.exists():
             raise ValueError("仮説ファイルが見つかりません。先に仮説を生成してください。")
         
@@ -520,10 +694,10 @@ async def process_data_for_validation(
         processed_outputs = []
         
         if pending_tasks:
-            console.print(f"\n[bold cyan]Starting data processing for {len(pending_tasks)} hypotheses...[/bold cyan]")
+            console.print(f"\n[bold {COLORS['info']}]Starting data processing for {len(pending_tasks)} hypotheses...[/]")
             
             for hypothesis_id in pending_tasks:
-                console.print(f"[cyan]Processing {hypothesis_id}...[/cyan]")
+                console.print(f"[{COLORS['info']}]Processing {hypothesis_id}...[/]")
                 
                 try:
                     # タスクステータスをin_progressに更新
@@ -578,7 +752,7 @@ async def process_data_for_validation(
                         )
                         
                         # サブエージェント呼び出し
-                        console.print(f"[cyan]  Attempt {attempt + 1}/{max_retries}...[/cyan]")
+                        console.print(f"[{COLORS['info']}]  Attempt {attempt + 1}/{max_retries}...[/]")
                         response_text = await _invoke_agent_async(agent, prompt)
                         
                         # レビュー（自己検証）
@@ -588,21 +762,22 @@ async def process_data_for_validation(
 {response_text}
 
 上記のレポートをレビューしてください。
+**重要: 出力は必ず "OK" または "NG: <理由>" の形式のみにしてください。余計な挨拶や説明は不要です。**
 """
                         review_result = await _invoke_agent_async(reviewer, review_prompt)
                         
                         if review_result.strip().startswith("OK"):
-                            console.print(f"[green]  Review passed![/green]")
+                            console.print(f"[{COLORS['success']}]  Review passed![/]")
                             final_response_text = response_text
                             break
                         else:
                             error_reason = review_result.replace("NG:", "").strip()
-                            console.print(f"[yellow]  Review failed: {error_reason}[/yellow]")
+                            console.print(f"[{COLORS['warning']}]  Review failed: {error_reason}[/]")
                             
                             if not is_last_attempt:
                                 current_feedback += f"\n\n## 品質レビューからのフィードバック（再試行 {attempt+1}回目）\n{error_reason}\n修正して再生成してください。\n"
                             else:
-                                console.print("[red]  Max retries reached. Saving last result.[/red]")
+                                console.print(f"[{COLORS['error']}]  Max retries reached. Saving last result.[/]")
                                 final_response_text = response_text
                     
                     # 個別ファイルに保存
@@ -676,8 +851,11 @@ async def validate_hypotheses(
     try:
         # 仮説と加工済みデータを取得
         project_dir = get_project_dir(project_name)
-        hypotheses_file = project_dir / state["steps"]["hypothesis"]["output_file"]
-        processed_data_file = project_dir / state["steps"]["process_data"]["output_file"]
+        hypotheses_file_name = state["steps"]["hypothesis"].get("output_file") or "hypotheses.md"
+        processed_data_file_name = state["steps"]["process_data"].get("output_file") or "processed_data.md"
+        
+        hypotheses_file = project_dir / hypotheses_file_name
+        processed_data_file = project_dir / processed_data_file_name
         
         if not hypotheses_file.exists():
             raise ValueError("仮説ファイルが見つかりません。")
@@ -685,7 +863,7 @@ async def validate_hypotheses(
             raise ValueError("加工済みデータファイルが見つかりません。")
         
         hypotheses_content = hypotheses_file.read_text()
-        processed_data_content = processed_data_file.read_text()
+        processed_data_text = processed_data_file.read_text() # Renamed from processed_data_content
         
         # エージェント作成
         model = _get_model()
@@ -712,25 +890,61 @@ async def validate_hypotheses(
                 lines.append(f"{prefix}{reason}")
             feedback_section = "\n## レビューコメント\n" + "\n".join(lines) + "\n"
 
-        # プロンプト構築
-        prompt = f"""
-        ## 仮説リスト
-        {hypotheses_content}
-
-        ## 加工済みデータ
-        {processed_data_content}
-
-        {feedback_section}
-
-        上記のデータを用いて仮説を検証してください。
-        Markdown形式で出力し、各仮説の検証結果、根拠となるデータ、主要指標を含めてください。
-        """
+        # 再試行ループ（最大3回）
+        max_retries = 3
+        current_feedback = feedback_section
+        final_response_text = ""
         
-        # エージェント呼び出し
-        response_text = await _invoke_agent_async(agent, prompt)
+        for attempt in range(max_retries):
+            is_last_attempt = (attempt == max_retries - 1)
+            
+            # プロンプト構築
+            prompt = f"""
+## 仮説リスト
+{hypotheses_content}
+
+## 加工済みデータ
+{processed_data_text}
+
+{current_feedback}
+
+システムプロンプトの指示に従い、加工済みデータを用いて仮説を検証してください。
+"""
+            
+            # エージェント呼び出し
+            console.print(f"[{COLORS['info']}]Validating hypotheses (Attempt {attempt + 1}/{max_retries})...[/]")
+            response_text = await _invoke_agent_async(agent, prompt)
+            
+            # レビュー（自己検証）
+            reviewer = _create_consulting_agent("validation_reviewer", model)
+            review_prompt = f"""
+## 検証結果レポート
+{response_text}
+
+上記の検証結果レポートをレビューしてください。
+**重要: 出力は必ず "OK" または "NG: <理由>" の形式のみにしてください。余計な挨拶や説明は不要です。**
+"""
+            review_result = await _invoke_agent_async(reviewer, review_prompt)
+            
+            if review_result.strip().startswith("OK"):
+                console.print(f"[{COLORS['success']}]  Review passed![/]")
+                final_response_text = response_text
+                break
+            else:
+                error_reason = review_result.replace("NG:", "").strip()
+                console.print(f"[{COLORS['warning']}]  Review failed: {error_reason}[/]")
+                
+                if not is_last_attempt:
+                    current_feedback += f"\n\n## 品質レビューからのフィードバック（再試行 {attempt+1}回目）\n{error_reason}\n修正して再生成してください。\n"
+                else:
+                    console.print(f"[{COLORS['error']}]  Max retries reached. Saving last result.[/]")
+                    final_response_text = response_text
         
-        # Markdownを保存
-        state["validation_results_markdown"] = response_text
+        # 結果を保存
+        state["validation_results_markdown"] = final_response_text
+        output_file = state["steps"]["validate"].get("output_file") or "validation_results.md"
+        output_path = project_dir / output_file
+        output_path.write_text(final_response_text)
         
         return state
         
@@ -764,8 +978,8 @@ async def plan_strategies(
         if not validation_file.exists():
             raise ValueError("検証結果ファイルが見つかりません。")
         
-        hypotheses_content = hypotheses_file.read_text()
-        validation_content = validation_file.read_text()
+        hypotheses_content = hypotheses_file.read_text() # This is not used in the new prompt, but kept for context if needed later.
+        validation_results = validation_file.read_text() # Renamed from validation_content
         
         # エージェント作成
         model = _get_model()
@@ -792,25 +1006,59 @@ async def plan_strategies(
                 lines.append(f"{prefix}{reason}")
             feedback_section = "\n## レビューコメント\n" + "\n".join(lines) + "\n"
 
-        # プロンプト構築
-        prompt = f"""
-        ## 仮説リスト
-        {hypotheses_content}
-
-        ## 検証結果
-        {validation_content}
-
-        {feedback_section}
-
-        検証済みの課題に対して具体的な対策・戦略を立案してください。
-        Markdown形式で出力し、各戦略にID、タイトル、詳細、優先度、期待される影響度、実装難易度、タイムライン、主要アクションを含めてください。
-        """
+        # 再試行ループ（最大3回）
+        max_retries = 3
+        current_feedback = feedback_section
+        final_response_text = ""
         
-        # エージェント呼び出し
-        response_text = await _invoke_agent_async(agent, prompt)
+        for attempt in range(max_retries):
+            is_last_attempt = (attempt == max_retries - 1)
+            
+            # プロンプト構築
+            prompt = f"""
+## 検証結果
+{validation_results}
+
+{current_feedback}
+
+システムプロンプトの指示に従い、検証済みの課題に対する戦略を立案してください。
+"""
+            
+            # エージェント呼び出し
+            console.print(f"[{COLORS['info']}]Planning strategies (Attempt {attempt + 1}/{max_retries})...[/]")
+            response_text = await _invoke_agent_async(agent, prompt)
+            
+            # レビュー（自己検証）
+            reviewer = _create_consulting_agent("strategy_reviewer", model)
+            review_prompt = f"""
+## 戦略立案レポート
+{response_text}
+
+上記の戦略立案レポートをレビューしてください。
+**重要: 出力は必ず "OK" または "NG: <理由>" の形式のみにしてください。余計な挨拶や説明は不要です。**
+"""
+            review_result = await _invoke_agent_async(reviewer, review_prompt)
+            
+            if review_result.strip().startswith("OK"):
+                console.print(f"[{COLORS['success']}]  Review passed![/]")
+                final_response_text = response_text
+                break
+            else:
+                error_reason = review_result.replace("NG:", "").strip()
+                console.print(f"[{COLORS['warning']}]  Review failed: {error_reason}[/]")
+                
+                if not is_last_attempt:
+                    current_feedback += f"\n\n## 品質レビューからのフィードバック（再試行 {attempt+1}回目）\n{error_reason}\n修正して再生成してください。\n"
+                else:
+                    console.print(f"[{COLORS['error']}]  Max retries reached. Saving last result.[/]")
+                    final_response_text = response_text
         
-        # Markdownを保存
-        state["strategies_markdown"] = response_text
+        # 結果を保存
+        # 結果を保存
+        state["strategies_markdown"] = final_response_text
+        output_file = state["steps"].get("plan", {}).get("output_file") or "strategies.md"
+        output_path = project_dir / output_file
+        output_path.write_text(final_response_text)
         
         return state
         

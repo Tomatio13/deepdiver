@@ -128,7 +128,7 @@ async def simple_cli(agent, assistant_id: str | None, session_state):
             # Ctrl+C at prompt - exit the program
             console.print("\nGoodbye!", style=COLORS["primary"])
             # Return to allow cleanup
-            return
+            os._exit(0)
 
         if not user_input:
             continue
@@ -139,7 +139,7 @@ async def simple_cli(agent, assistant_id: str | None, session_state):
             if result == "exit":
                 console.print("\nGoodbye!", style=COLORS["primary"])
                 # Return to allow cleanup
-                return
+                os._exit(0)
             if result:
                 # Command was handled, continue to next input
                 continue
@@ -153,7 +153,7 @@ async def simple_cli(agent, assistant_id: str | None, session_state):
         if user_input.lower() in ["quit", "exit", "q"]:
             console.print("\nGoodbye!", style=COLORS["primary"])
             # Return to allow cleanup
-            return
+            os._exit(0)
 
         await execute_task(user_input, agent, assistant_id, session_state)
 
