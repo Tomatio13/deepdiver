@@ -1130,21 +1130,54 @@ async def generate_consulting_report(
                 lines.append(f"{prefix}{reason}")
             feedback_section = "\n## レビューコメント\n" + "\n".join(lines) + "\n"
 
-        # プロンプト構築
-        prompt = f"""
-        {all_content}
+        # 再試行ループ（最大3回）
+        max_retries = 3
+        current_feedback = feedback_section
+        final_response_text = ""
 
-        {feedback_section}
+        reviewer = _create_consulting_agent("report_reviewer", model)
 
-        上記の情報を統合し、経営コンサルレポートを作成してください。
-        Markdown形式で、エグゼクティブサマリー、分析概要、検証された課題、推奨対策、データ可視化の推奨、次のステップを含めてください。
-        """
-        
-        # エージェント呼び出し
-        response_text = await _invoke_agent_async(agent, prompt)
-        
+        for attempt in range(max_retries):
+            is_last_attempt = (attempt == max_retries - 1)
+
+            # プロンプト構築
+            prompt = f"""
+{all_content}
+
+{current_feedback}
+
+上記の情報を統合し、経営コンサルレポートを作成してください。
+Markdown形式で、エグゼクティブサマリー、分析概要、検証された課題、推奨対策、データ可視化の推奨、次のステップを含めてください。
+"""
+
+            console.print(f"[{COLORS['info']}]Generating report (Attempt {attempt + 1}/{max_retries})...[/]")
+            response_text = await _invoke_agent_async(agent, prompt)
+
+            review_prompt = f"""
+## 経営コンサルレポート
+{response_text}
+
+上記のレポートをレビューしてください。
+**重要: 出力は必ず "OK" または "NG: <理由>" の形式のみにしてください。余計な挨拶や説明は不要です。**
+"""
+            review_result = await _invoke_agent_async(reviewer, review_prompt)
+
+            if review_result.strip().startswith("OK"):
+                console.print(f"[{COLORS['success']}]  Review passed![/]")
+                final_response_text = response_text
+                break
+            else:
+                error_reason = review_result.replace("NG:", "").strip()
+                console.print(f"[{COLORS['warning']}]  Review failed: {error_reason}[/]")
+
+                if not is_last_attempt:
+                    current_feedback += f"\n\n## 品質レビューからのフィードバック（再試行 {attempt+1}回目）\n{error_reason}\n修正して再生成してください。\n"
+                else:
+                    console.print(f"[{COLORS['error']}]  Max retries reached. Saving last result.[/]")
+                    final_response_text = response_text
+
         # Markdownを保存
-        state["report_markdown"] = response_text
+        state["report_markdown"] = final_response_text
         
         return state
         
@@ -1152,4 +1185,3 @@ async def generate_consulting_report(
         state["errors"] = state.get("errors", [])
         state["errors"].append(f"レポート生成に失敗しました: {e}")
         return state
-

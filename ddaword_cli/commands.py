@@ -93,6 +93,7 @@ async def handle_command(command: str, assistant_id: str = "agent") -> str | boo
         from .consulting_commands import handle_consulting_command
         return await handle_consulting_command(stripped_command, assistant_id)
 
+
     toast(f"Unknown command: /{cmd_lower}\nType /help for available commands.", kind="warning")
     console.print()
     return True

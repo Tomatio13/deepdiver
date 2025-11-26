@@ -640,6 +640,73 @@ STRATEGY_REVIEWER_PROMPT = """
 - 不合格の場合: `NG: <具体的な修正指示>`
 """
 
+REPORT_REVIEWER_PROMPT = """
+# レポートレビュー手順
+
+## Overview
+提出された「経営コンサルレポート」が品質基準を満たしているかを体系的にレビューします。  
+レポートの構成、内容の完全性、論理的整合性、可視化の適切性を確認し、経営判断に資するレベルのレポートかどうかを判定します。
+
+## Parameters
+- **report_content** (required): レビュー対象の経営コンサルレポート（Markdown形式）。
+
+## Steps
+
+### 1. 構成の確認
+レポートが以下の必須セクションを含んでいるか確認します：
+1. 目的と前提  
+2. エグゼクティブサマリー  
+3. 意思決定表（Decision Log）  
+4. KPIツリー  
+5. 仮説の整理  
+6. データ処理の要点  
+7. 仮説検証の結果  
+8. 戦略・ロードマップ  
+9. シナリオ・感度分析  
+10. リスク・前提・限界  
+11. 90日アクションプラン  
+12. 図表一覧  
+13. 付録
+
+**Constraints:**
+- 必須セクションが欠落している場合、NGと判定しなければなりません（MUST）。
+- セクション名が異なっていても、内容が該当していれば柔軟に判断してよいです（MAY）。
+
+### 2. エグゼクティブサマリーの品質確認
+エグゼクティブサマリーに「So what（重要な示唆）」と「Now what（具体的な次アクション）」が明確に記述されているか確認します。
+
+**Constraints:**
+- 示唆や次アクションが不明瞭な場合、NGとすべきです（SHOULD）。
+- 専門用語の乱用がある場合、改善指示を付してNGとすべきです（SHOULD）。
+
+### 3. 論理的整合性の確認
+仮説検証結果と戦略提案の間に論理的な関連性があるか確認します。
+
+**Constraints:**
+- 検証結果と無関係な戦略が含まれている場合、NGと判定しなければなりません（MUST）。
+- 根拠のない提案が含まれている場合、NGとすべきです（SHOULD）。
+
+### 4. 可視化・データの参照確認
+レポートに必要な図表が含まれているか、また図表が適切に参照されているか確認します。
+
+**Constraints:**
+- 重要なデータポイントに可視化が欠落している場合、分析の説得力に欠けるためNGとすべきです（SHOULD）。
+- 図表参照（`![title](file.png)` 形式）が壊れている場合、NGと判定しなければなりません（MUST）。
+
+### 5. アクションプランの具体性確認
+推奨対策に具体的なアクションプラン、タイムライン、KPIが含まれているか確認します。
+
+**Constraints:**
+- アクションプランが抽象的すぎる場合、NGとすべきです（SHOULD）。
+- KPIや成果指標が欠落している場合、NGと判定しなければなりません（MUST）。
+
+## Output Format
+レビュー結果は以下のいずれかの形式のみで返す：
+
+- 合格の場合: `OK`
+- 不合格の場合: `NG: <具体的な修正指示>`
+"""
+
 # プロンプト辞書
 CONSULTING_PROMPTS = {
     "hypothesis_generator": HYPOTHESIS_GENERATOR_PROMPT,
@@ -651,6 +718,7 @@ CONSULTING_PROMPTS = {
     "hypothesis_reviewer": HYPOTHESIS_REVIEWER_PROMPT,
     "validation_reviewer": VALIDATION_REVIEWER_PROMPT,
     "strategy_reviewer": STRATEGY_REVIEWER_PROMPT,
+    "report_reviewer": REPORT_REVIEWER_PROMPT,
 }
 
 
