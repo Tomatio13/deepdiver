@@ -14,8 +14,13 @@ from strands_tools import editor, environment, file_read, file_write, http_reque
 from .csv_tool import filter_csv_data
 
 from .config import create_model, console, COLORS
-from .consulting_prompts import CONSULTING_PROMPTS, get_data_processing_prompt
+from .consulting_prompts import (
+    CONSULTING_PROMPTS,
+    STRONGEST_HYPOTHESIS_DESIGN,
+    get_data_processing_prompt,
+)
 from .consulting_state import (
+    CONSULTING_DIR,
     get_project_dir,
     load_state,
     initialize_process_data_tasks,
@@ -27,6 +32,120 @@ from .consulting_state import (
 _cached_model: Any = None
 
 DEFAULT_TOOLS = [file_read, file_write, editor, shell, http_request, environment,calculator,current_time]
+
+SUMMARY_HEADING = "## 選定サマリー"
+FINAL_HEADING = "## 統合レポート"
+MAX_SECTION_CHARS = 5000
+
+
+def _stringify_response(response: Any) -> str:
+    """レスポンスオブジェクトから文字列を抽出する。"""
+    if response is None:
+        return ""
+    if isinstance(response, str):
+        return response
+    if hasattr(response, "output_text"):
+        return str(response.output_text)
+    if hasattr(response, "content"):
+        return str(response.content)
+    if isinstance(response, dict):
+        for key in ("output_text", "content", "text", "message"):
+            value = response.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+        return str(response)
+    return str(response)
+
+
+def _sanitize_final_report(text: str) -> str:
+    """最終レポートから元レポート参照等を除去し体裁を整える。"""
+    cleaned = re.sub(r"report[\w-]*:H\d+", "", text, flags=re.IGNORECASE)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
+def _clamp(text: str, limit: int = MAX_SECTION_CHARS) -> str:
+    """長文を指定文字数で切り詰める。"""
+    if len(text) <= limit:
+        return text
+    head = limit - 200
+    tail = 200
+    return text[:head] + "\n... (truncated) ...\n" + text[-tail:]
+
+
+def _extract_markdown_section(content: str, keyword: str) -> str | None:
+    """Markdown本文から見出し単位で指定キーワードを含むセクションを抽出する。"""
+    pattern = rf"(?ms)^#{1,6}\s.*{re.escape(keyword)}.*?$.*?(?=^#{1,6}\s|\Z)"
+    match = re.search(pattern, content, re.MULTILINE)
+    if match:
+        return match.group(0).strip()
+    return None
+
+
+def _extract_hypothesis_blocks(content: str) -> list[str]:
+    """仮説セクションを抽出してリスト化する。"""
+    patterns = [
+        r"(?ms)^###\s+ID:\s*(H\d+).*?(?=^###\s+ID:|^##\s+ID:|^#|\Z)",
+        r"(?ms)^##\s*(H\d+).*?(?=^##\s*H\d+|^#|\Z)",
+    ]
+    blocks: list[str] = []
+    for pattern in patterns:
+        for match in re.finditer(pattern, content, re.MULTILINE):
+            blocks.append(match.group(0).strip())
+    return blocks
+
+
+def _build_report_context(report_path: Path) -> str:
+    """個別レポートから分析に必要なサマリーを生成する。"""
+    raw = report_path.read_text()
+    sections: list[str] = []
+
+    for keyword in [
+        "仮説の整理",
+        "仮説検証",
+        "仮説検証の結果",
+        "意思決定",
+        "エグゼクティブサマリー",
+    ]:
+        section = _extract_markdown_section(raw, keyword)
+        if section:
+            sections.append(section)
+
+    hypothesis_blocks = _extract_hypothesis_blocks(raw)
+    if hypothesis_blocks:
+        sections.append("## 抽出した仮説\n" + "\n\n".join(hypothesis_blocks))
+
+    if not sections:
+        sections.append(_clamp(raw))
+
+    combined = "\n\n".join(sections)
+    combined = _clamp(combined)
+    return f"### レポート: {report_path.name}\n{combined}"
+
+
+def _build_prompt(design_text: str, report_contexts: list[str]) -> str:
+    """デザイン仕様とレポートサマリーから生成指示プロンプトを構築する。"""
+    reports_block = "\n\n".join(report_contexts)
+    return (
+        "# design.mdの要件\n"
+        + design_text.strip()
+        + "\n\n# 入力レポート概要\n"
+        + reports_block
+        + "\n\n# 出力指示\n"
+        "- design.mdに沿ってカテゴリ分けと最強仮説選定を行うこと\n"
+        "- 必ず2部構成で出力すること: 1) 選定サマリー, 2) 統合レポート\n"
+        "- 選定サマリーでは参照元レポート名と仮説IDを明記すること\n"
+        "- 統合レポートには元レポート名/IDを記載しないこと\n"
+        "- 統合レポートは13セクション構成（design.md準拠）で書くこと\n"
+    )
+
+
+def _discover_consulting_reports(base_dir: Path) -> list[Path]:
+    """指定ディレクトリ配下から report.md を探索する。"""
+    if not base_dir.exists():
+        return []
+    return sorted(base_dir.rglob("report.md"))
 
 def _get_model():
     """モデルインスタンスを取得（キャッシュを使用）。"""
@@ -1066,6 +1185,136 @@ async def plan_strategies(
         state["errors"] = state.get("errors", [])
         state["errors"].append(f"戦略立案に失敗しました: {e}")
         return state
+
+
+async def generate_strongest_consulting_report(
+    report_paths: list[Path] | None = None,
+    output_dir: Path | None = None,
+    selection_filename: str = "selection_summary.md",
+    report_filename: str = "strongest_report.md",
+) -> dict[str, Any]:
+    """複数レポートから最強仮説を選定し統合レポートを生成する。"""
+    console.print(f"[{COLORS['info']}]最強仮説の統合レポート生成を開始します...[/]")
+
+    if report_paths is None:
+        report_paths = _discover_consulting_reports(CONSULTING_DIR)
+
+    if not report_paths:
+        raise FileNotFoundError(".consulting 配下に report.md が見つかりません。")
+
+    console.print(f"[dim]入力レポート数: {len(report_paths)}[/dim]")
+    for path in report_paths:
+        console.print(f"[dim]  - {path}[/dim]")
+
+    design_text = STRONGEST_HYPOTHESIS_DESIGN
+    report_contexts = [_build_report_context(path) for path in report_paths]
+    prompt = _build_prompt(design_text, report_contexts)
+
+    model = _get_model()
+    if model is None:
+        raise ValueError(
+            "LLMモデルが設定されていません。"
+            "STRANDS_MODEL_PROVIDER環境変数を設定してください。"
+        )
+
+    writer_agent = Agent(
+        model=model,
+        system_prompt=CONSULTING_PROMPTS["strongest_hypothesis_selector"],
+        tools=[],
+    )
+    reviewer_agent = Agent(
+        model=model,
+        system_prompt=CONSULTING_PROMPTS["report_reviewer"],
+        tools=[],
+    )
+
+    max_retries = 3
+    current_feedback = ""
+    final_summary = ""
+    final_report = ""
+    last_review = ""
+    response_content = ""
+    attempt_count = 0
+
+    for attempt in range(max_retries):
+        attempt_count = attempt + 1
+        is_last = attempt == max_retries - 1
+        console.print(f"[{COLORS['info']}]  Attempt {attempt_count}/{max_retries}[/]")
+
+        body_prompt = prompt
+        if current_feedback:
+            body_prompt += f"\n\n# レビューからのフィードバック\n{current_feedback}\n"
+
+        response = await writer_agent.invoke_async(body_prompt)
+        content = _stringify_response(response).strip()
+        response_content = content
+
+        summary_match = re.search(
+            rf"(?ms){SUMMARY_HEADING}.*?(?=^##\s|\Z)", content, re.MULTILINE
+        )
+        report_match = re.search(
+            rf"(?ms){FINAL_HEADING}.*", content, re.MULTILINE
+        )
+        summary_text = summary_match.group(0).strip() if summary_match else ""
+        report_text = report_match.group(0).strip() if report_match else content
+        report_text = _sanitize_final_report(report_text)
+
+        review_prompt = (
+            f"{FINAL_HEADING}\n{report_text}\n\n"
+            "上記のレポートをレビューしてください。\n"
+            '**重要: 出力は必ず "OK" または "NG: <理由>" の形式のみにしてください。余計な挨拶や説明は不要です。**'
+        )
+        review_result = await reviewer_agent.invoke_async(review_prompt)
+        review_text = _stringify_response(review_result).strip()
+        last_review = review_text
+
+        if review_text.startswith("OK"):
+            console.print(f"[{COLORS['success']}]  Review passed![/]")
+            final_summary = summary_text
+            final_report = report_text
+            break
+
+        error_reason = review_text.replace("NG:", "").strip()
+        console.print(f"[{COLORS['warning']}]  Review failed: {error_reason}[/]")
+
+        if not is_last:
+            current_feedback += f"\n- {error_reason}"
+        else:
+            final_summary = summary_text
+            final_report = report_text
+            console.print(f"[{COLORS['error']}]  Max retries reached. Saving last result.[/]")
+
+    if not final_report:
+        final_report = _sanitize_final_report(response_content)
+
+    output_base = (output_dir or (CONSULTING_DIR / "strongest")).resolve()
+    output_base.mkdir(parents=True, exist_ok=True)
+
+    summary_path: Path | None = None
+    if final_summary:
+        summary_path = output_base / selection_filename
+        summary_path.write_text(final_summary + "\n")
+
+    report_path = output_base / report_filename
+    report_path.write_text(final_report + "\n")
+
+    console.print(
+        f"[green]✓ 統合レポートを生成しました[/green] {report_path}",
+        style=COLORS["success"],
+    )
+    if summary_path:
+        console.print(
+            f"[green]✓ 選定サマリーを保存しました[/green] {summary_path}",
+            style=COLORS["success"],
+        )
+
+    return {
+        "summary_path": summary_path,
+        "report_path": report_path,
+        "attempts": attempt_count,
+        "last_review": last_review,
+        "used_reports": report_paths,
+    }
 
 
 async def generate_consulting_report(

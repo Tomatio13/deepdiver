@@ -26,6 +26,7 @@ from .consulting_agents import (
     validate_hypotheses,
     plan_strategies,
     generate_consulting_report,
+    generate_strongest_consulting_report,
 )
 
 
@@ -660,6 +661,48 @@ async def handle_consulting_command(command: str, assistant_id: str = "agent") -
         
         return True
     
+    # /consulting:strongest [output_dir]
+    elif cmd.startswith("consulting:strongest"):
+        output_dir_arg: Path | None = None
+        if len(original_parts) >= 2:
+            raw_path = Path(original_parts[1])
+            if not raw_path.is_absolute():
+                raw_path = (CONSULTING_DIR / raw_path)
+            output_dir_arg = raw_path
+
+        console.print("[dim].consulting配下のreport.mdを探索しています...[/dim]")
+        try:
+            result = await generate_strongest_consulting_report(
+                output_dir=output_dir_arg
+            )
+        except FileNotFoundError as e:
+            console.print(f"[red]{e}[/red]")
+            console.print()
+            return True
+        except Exception as e:
+            console.print(f"[red]エラー: 最強仮説レポート生成に失敗しました: {e}[/red]")
+            console.print()
+            return True
+
+        report_path = result.get("report_path")
+        summary_path = result.get("summary_path")
+        used_reports = result.get("used_reports", [])
+
+        if used_reports:
+            console.print()
+            console.print("[bold]入力レポート一覧:[/bold]")
+            for path in used_reports:
+                console.print(f"  - {path}")
+
+        console.print()
+        if report_path:
+            console.print(f"[green]最終レポート: {report_path}[/green]")
+        if summary_path:
+            console.print(f"[green]選定サマリー: {summary_path}[/green]")
+
+        console.print()
+        return True
+    
     # /consulting:status [project_name]
     elif cmd.startswith("consulting:status"):
         if len(original_parts) >= 2:
@@ -787,6 +830,7 @@ async def handle_consulting_command(command: str, assistant_id: str = "agent") -
             "[dim]利用可能なコマンド: "
             "/consulting:init, /consulting:hypothesis, /consulting:process-data, "
             "/consulting:validate, /consulting:strategy, /consulting:report, "
+            "/consulting:strongest, "
             "/consulting:approve, /consulting:reject, /consulting:status[/dim]"
         )
         console.print()

@@ -81,6 +81,7 @@ CONSULTING_COMMANDS = {
     "status": "現在の状態を表示 [project_name]",
     "approve": "現在のステップを承認 <project_name>",
     "reject": "現在のステップを否決 <project_name>",
+    "strongest": "複数レポートから最強仮説レポートを生成 [output_dir]",
 }
 
 
