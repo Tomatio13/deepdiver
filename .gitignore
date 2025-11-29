@@ -19,3 +19,7 @@ ddaword_cli.egg-info/
 sample_data/
 Data/
 fudosan/
+
+strongest_hypothesis/
+fish_data/
+tests/
