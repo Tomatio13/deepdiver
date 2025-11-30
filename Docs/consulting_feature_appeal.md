@@ -35,7 +35,7 @@
 ---
 
 ## 3. 開発環境とコアテクノロジー：AWS Strands Agent によるフルスクラッチ開発
-![FUJITSU DDM-AWord ](DDM-Aword-Cli.png)
+
 本システムは、既存のチャットボット作成ツールやNo-Codeプラットフォームを使用せず、AWSの先進的なエージェントフレームワーク **「Strands Agent」** を基盤として、Pythonでフルスクラッチ開発しました。
 
 ### 技術スタック
@@ -54,7 +54,7 @@ Strands Agent のプリミティブな機能を活用し、**「認知科学に�
 ---
 
 ## 4. 設計思想：Spec駆動開発 (SDD) の応用とAIネイティブUX
-
+![FUJITSU DDM-AWord ](DDM-Aword-Cli.png)
 本ツールの設計および操作プロセスは、**AWS Kiro**、**cc-sdd**、**GitHub Copilot Spec Kit** などで提唱されている最先端のAI開発手法 **「Spec駆動開発 (Spec-Driven Development)」** の哲学を強く反映しています。
 
 ### Spec駆動のコンサルティングプロセス
@@ -68,9 +68,21 @@ Strands Agent のプリミティブな機能を活用し、**「認知科学に�
 
 ---
 
+## 5. プロンプト設計思想：SOPによるエージェントの専門家化
+![prompt_design](prompt_design.svg)
 
+本システムの各専門エージェント（仮説立案、データ加工など）は、単に役割を与えられているだけではありません。その思考と行動は、特定のタスクを高い品質で再現可能にするための極めて詳細な標準操作手順書 **「SOP（Standard Operating Procedure）」** によって規定されています。
 
-## 5. データドリブン・コンサルティング・ワークフロー
+プロンプトの設計思想は **Anthropicが提唱する「Skills」や、AWS Strands Agentsの「SOP for Agents」といった最先端のAIエージェント開発手法を強く参考**にしています。
+
+*   **SOPs**: 各プロンプトは単なる指示ではなく、エージェントに特定の「スキル」を動的に付与する役割を果たします。これにより、同じLLM基盤を使いながらも、タスクに応じて「データサイエンティスト」「戦略コンサルタント」といった専門家として振る舞うことが可能になります。
+*   **再現性と品質の担保**: SOPには、思考のステップ、満たすべき制約（Constraints）、アウトプットの形式などが厳密に定義されています。AIは常にこの手順に従うため、属人性を排した一貫性のある高品質なアウトプットを生成できます。
+
+このアプローチにより、本ツールは単なる対話AIではなく、各分野の専門知識を備えたプロフェッショナル集団として機能します。
+
+---
+
+## 6. データドリブン・コンサルティング・ワークフロー
 
 ![Architecture](consulting_architecture.png)
 
@@ -103,7 +115,7 @@ Strands Agent のプリミティブな機能を活用し、**「認知科学に�
 
 ---
 
-## 6. アンサンブル・コンサルティング方式による「最強の仮説」の作成
+## 7. アンサンブル・コンサルティング方式による「最強の仮説」の作成
 
 本発表では、単一のコンサルティングプロジェクトだけでなく、複数のコンサルティングプロジェクトを生成し、その結果を統合する「アンサンブル方式」で、より堅牢で説得力のある戦略を作成する方式を取りました。
 
@@ -131,7 +143,7 @@ Strands Agent のプリミティブな機能を活用し、**「認知科学に�
 
 ---
 
-## 7. 結論：AIデータドリブンコンペにおける優位性
+## 8. 結論：AIデータドリブンコンペにおける優位性
 
 FUJITSU DDM-AWord  CLI は、単にLLMをAPIで叩くだけのツールではありません。
 
@@ -143,12 +155,13 @@ FUJITSU DDM-AWord  CLI は、単にLLMをAPIで叩くだけのツールではあ
 
 ---
 
-## 8. 関連リンク・参考文献
+## 9. 関連リンク・参考文献
 
 *   **AWS Kiro**: <https://kiro.dev/>
 *   **cc-sdd (Chat-Centric Spec-Driven Development)**: <https://github.com/gotalab/cc-sdd>
 *   **GitHub Copilot Spec Kit**: <https://github.com/github/spec-kit>
-
+*   **Anthropic Skills**: <https://github.com/anthropics/skills>
+*   **AWS Strands Agents SOP for Agents**: <https://github.com/anthropics/skills>
 
 
 

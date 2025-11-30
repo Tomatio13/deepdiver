@@ -1,0 +1,103 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background -->
+    <rect width="1280" height="720" fill="#121212"/>
+    
+    <!-- Grid Pattern (Subtle Background) -->
+    <defs>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#222222" stroke-width="1"/>
+        </pattern>
+        <filter id="glow-blue" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+            <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+        </filter>
+        <filter id="glow-orange" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+            <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+        </filter>
+    </defs>
+    <rect width="1280" height="720" fill="url(#grid)"/>
+
+    <!-- Title Section -->
+    <g transform="translate(640, 80)">
+        <text font-family="'Noto Sans JP', sans-serif" font-size="42" fill="#FFFFFF" text-anchor="middle" font-weight="bold" letter-spacing="2">プロンプト設計思想</text>
+        <text y="50" font-family="'Noto Sans JP', sans-serif" font-size="24" fill="#AAAAAA" text-anchor="middle">SOPによるエージェントの専門家化</text>
+        <line x1="-200" y1="70" x2="200" y2="70" stroke="#66B2FF" stroke-width="2"/>
+    </g>
+
+    <!-- Left Column: INSPIRATION (Blue Theme) -->
+    <g transform="translate(100, 250)">
+        <!-- Header -->
+        <text x="150" y="-30" font-family="'Noto Sans JP', sans-serif" font-size="18" fill="#66B2FF" text-anchor="middle" letter-spacing="1">INSPIRATION / REFERENCES</text>
+        
+        <!-- Card 1 -->
+        <rect x="0" y="0" width="300" height="90" rx="8" fill="#1E1E1E" stroke="#66B2FF" stroke-width="2"/>
+        <text x="150" y="35" font-family="'Noto Sans JP', sans-serif" font-size="20" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Anthropic "Skills"</text>
+        <text x="150" y="65" font-family="'Noto Sans JP', sans-serif" font-size="14" fill="#BBBBBB" text-anchor="middle">動的なスキル付与</text>
+
+        <!-- Card 2 -->
+        <rect x="0" y="110" width="300" height="90" rx="8" fill="#1E1E1E" stroke="#66B2FF" stroke-width="2"/>
+        <text x="150" y="145" font-family="'Noto Sans JP', sans-serif" font-size="20" fill="#FFFFFF" text-anchor="middle" font-weight="bold">AWS Strands Agents</text>
+        <text x="150" y="175" font-family="'Noto Sans JP', sans-serif" font-size="14" fill="#BBBBBB" text-anchor="middle">SOP for Agents</text>
+    </g>
+
+    <!-- Center Column: CORE (Orange Theme) -->
+    <g transform="translate(480, 220)">
+        <!-- Connector Lines from Left -->
+        <path d="M -80 75 L 0 140 M -80 185 L 0 140" fill="none" stroke="#444444" stroke-width="2"/>
+        <circle cx="0" cy="140" r="6" fill="#444444"/>
+
+        <!-- Main Box -->
+        <rect x="20" y="0" width="320" height="280" rx="12" fill="#252525" stroke="#FF9900" stroke-width="3" filter="url(#glow-orange)"/>
+        
+        <text x="180" y="50" font-family="'Noto Sans JP', sans-serif" font-size="28" fill="#FF9900" text-anchor="middle" font-weight="bold">SOP</text>
+        <text x="180" y="80" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#FFFFFF" text-anchor="middle">Standard Operating Procedure</text>
+        
+        <line x1="60" y1="100" x2="300" y2="100" stroke="#444444" stroke-width="1"/>
+
+        <!-- Content List -->
+        <g transform="translate(60, 140)">
+            <text x="0" y="0" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#DDDDDD">✓ 思考ステップの定義</text>
+            <text x="0" y="40" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#DDDDDD">✓ 制約条件 (Constraints)</text>
+            <text x="0" y="80" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#DDDDDD">✓ アウトプット形式</text>
+        </g>
+    </g>
+
+    <!-- Right Column: BENEFITS (White/Blue Theme) -->
+    <g transform="translate(900, 250)">
+         <!-- Connector Lines from Center -->
+         <path d="M -80 140 L 0 75 M -80 140 L 0 185" fill="none" stroke="#444444" stroke-width="2"/>
+         <polygon points="-5,75 5,70 5,80" fill="#444444" transform="translate(-5,0)"/>
+         <polygon points="-5,185 5,180 5,190" fill="#444444" transform="translate(-5,0)"/>
+
+        <!-- Header -->
+        <text x="150" y="-30" font-family="'Noto Sans JP', sans-serif" font-size="18" fill="#FFFFFF" text-anchor="middle" letter-spacing="1">VALUE &amp; OUTCOMES</text>
+
+        <!-- Outcome 1 -->
+        <g>
+            <rect x="0" y="0" width="300" height="100" rx="8" fill="#1E1E1E" stroke="#DDDDDD" stroke-width="1"/>
+            <text x="20" y="35" font-family="'Noto Sans JP', sans-serif" font-size="20" fill="#FFFFFF" font-weight="bold">専門家化</text>
+            <text x="20" y="65" font-family="'Noto Sans JP', sans-serif" font-size="14" fill="#AAAAAA">同じLLMで「データ科学者」<tspan x="20" dy="20">「戦略家」等を使い分け</tspan></text>
+            <circle cx="260" cy="50" r="20" fill="#333333"/>
+            <text x="260" y="57" font-family="'Noto Sans JP', sans-serif" font-size="20" fill="#FFFFFF" text-anchor="middle">👤</text>
+        </g>
+
+        <!-- Outcome 2 -->
+        <g transform="translate(0, 120)">
+            <rect x="0" y="0" width="300" height="100" rx="8" fill="#1E1E1E" stroke="#DDDDDD" stroke-width="1"/>
+            <text x="20" y="35" font-family="'Noto Sans JP', sans-serif" font-size="20" fill="#FFFFFF" font-weight="bold">品質の担保</text>
+            <text x="20" y="65" font-family="'Noto Sans JP', sans-serif" font-size="14" fill="#AAAAAA">属人性を排除し、再現性のある<tspan x="20" dy="20">高品質な分析を実現</tspan></text>
+            <circle cx="260" cy="50" r="20" fill="#333333"/>
+            <text x="260" y="57" font-family="'Noto Sans JP', sans-serif" font-size="20" fill="#FFFFFF" text-anchor="middle">🛡️</text>
+        </g>
+    </g>
+
+    <!-- Footer -->
+    <text x="1240" y="700" font-family="'Noto Sans JP', sans-serif" font-size="12" fill="#555555" text-anchor="end">FUJITSU DDM-AWord CLI Architecture</text>
+</svg>
