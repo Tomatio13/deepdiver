@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FUJITSU DDM-AWord CLI - 質問するAIから、思考するAIへ</title>
+    <meta name="description" content="データドリブン経営を、自律的に。AWS Strands Agent × 認知科学。フルスクラッチで実装した、次世代コンサルティングCLI">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Noto+Sans+JP:wght@300;400;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #1e40af;
+            --primary-blue-light: #3b82f6;
+            --secondary-cyan: #06b6d4;
+            --accent-emerald: #10b981;
+            --bg-dark: #0a0e1a;
+            --bg-dark-light: #111827;
+            --text-white: #ffffff;
+            --text-gray: #e5e7eb;
+        }
+
+        html,
+        body {
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-white);
+        }
+
+        body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr;
+        }
+
+        /* Left Side - Hero */
+        .hero {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 0 80px;
+            background: linear-gradient(135deg, #0a0e1a 0%, #1e293b 100%);
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
+            animation: rotate 20s linear infinite;
+        }
+
+        @keyframes rotate {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .logo {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--secondary-cyan);
+            margin-bottom: 3rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, #ffffff 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.3rem;
+            color: var(--text-gray);
+            margin-bottom: 3rem;
+            line-height: 1.6;
+            font-weight: 300;
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 3rem;
+            margin-bottom: 3rem;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--secondary-cyan);
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-gray);
+            font-weight: 300;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 1rem 2.5rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            background: linear-gradient(135deg, var(--primary-blue-light), var(--secondary-cyan));
+            color: var(--text-white);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(59, 130, 246, 0.5);
+        }
+
+        /* Right Side - Visual */
+        .visual {
+            position: relative;
+            background: linear-gradient(135deg, rgba(30, 58, 138, 0.3), rgba(6, 182, 212, 0.2)),
+                url('https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?w=1000&q=80') center/cover;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px;
+        }
+
+        .visual::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(10, 14, 26, 0.7), rgba(30, 58, 138, 0.5));
+        }
+
+        .features-container {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 2.5rem;
+            text-align: center;
+            color: var(--text-white);
+        }
+
+        .feature-card {
+            background: rgba(17, 24, 39, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.2rem;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateX(5px);
+            border-color: var(--secondary-cyan);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2);
+        }
+
+        .feature-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .feature-number {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary-blue-light), var(--secondary-cyan));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+
+        .feature-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-white);
+        }
+
+        .feature-description {
+            font-size: 0.9rem;
+            color: var(--text-gray);
+            line-height: 1.5;
+            padding-left: 56px;
+            font-weight: 300;
+        }
+
+        .tech-badge-container {
+            position: absolute;
+            bottom: 40px;
+            left: 60px;
+            right: 60px;
+            z-index: 3;
+            display: flex;
+            gap: 0.8rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .tech-badge {
+            background: rgba(17, 24, 39, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: var(--secondary-cyan);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            font-weight: 500;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Left Side - Hero -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="logo">FUJITSU DDM-AWord</div>
+            <h1>データが戦略に変わる。<br>AIが、思考する。</h1>
+            <p>データドリブン経営を、自律的に。<br>AWS Strands Agent × 認知科学で実現する、次世代コンサルティング。</p>
+
+            <div class="hero-stats">
+                <div class="stat">
+                    <div class="stat-number">5</div>
+                    <div class="stat-label">専門AIエージェント</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label">自律的な課題発見</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">∞</div>
+                    <div class="stat-label">統計的検証</div>
+                </div>
+            </div>
+            <img src="DDM-Aword-Cli.png" alt="DDM-AWord CLI" width="600">
+            <br><br><br>
+            <a href="#" class="btn">今すぐ始める</a>
+        </div>
+    </section>
+
+    <!-- Right Side - Visual & Features -->
+    <section class="visual">
+        <div class="features-container">
+            <h2 class="section-title">5つのステップで、戦略を導く</h2>
+
+            <div class="feature-card">
+                <div class="feature-header">
+                    <div class="feature-number">1</div>
+                    <div class="feature-title">仮説立案</div>
+                </div>
+                <div class="feature-description">AIがデータをスキャンし、潜在的な経営課題を自ら発見</div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-header">
+                    <div class="feature-number">2</div>
+                    <div class="feature-title">データ加工</div>
+                </div>
+                <div class="feature-description">Pythonコードを自動生成・実行し、検証に必要なデータを抽出</div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-header">
+                    <div class="feature-number">3</div>
+                    <div class="feature-title">統計検証</div>
+                </div>
+                <div class="feature-description">信頼度スコアと共に、仮説の成立/不成立を厳密に判定</div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-header">
+                    <div class="feature-number">4</div>
+                    <div class="feature-title">戦略立案</div>
+                </div>
+                <div class="feature-description">ROIを意識した優先順位付けで、実行可能な戦略を提案</div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-header">
+                    <div class="feature-number">5</div>
+                    <div class="feature-title">レポート生成</div>
+                </div>
+                <div class="feature-description">プレゼン資料として即利用可能な、高品質レポートを出力</div>
+            </div>
+        </div>
+
+        <div class="tech-badge-container">
+            <span class="tech-badge">AWS Strands Agent</span>
+            <span class="tech-badge">Python 3.10+</span>
+            <span class="tech-badge">フルスクラッチ開発</span>
+            <span class="tech-badge">認知科学ベース</span>
+        </div>
+    </section>
+</body>
+
+</html>

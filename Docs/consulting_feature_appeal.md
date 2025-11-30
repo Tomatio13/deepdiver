@@ -9,7 +9,7 @@
 
 認知科学に基づく高度なメモリモデルと、厳密なデータ検証プロセスを組み合わせることで、**「データの裏付け（エビデンス）に基づいた、実行可能な経営戦略」** を導き出します。
 
-![FUJITSU DDM-AWord CLI](consulting_feature_appeal.svg)
+![FUJITSU DDM-AWord CLI](consulting_feature_appeal.png)
 
 ---
 
@@ -69,9 +69,9 @@ Strands Agent のプリミティブな機能を活用し、**「認知科学に�
 ---
 
 ## 5. プロンプト設計思想：SOPによるエージェントの専門家化
-![prompt_design](prompt_design.svg)
+![prompt_design](prompt_design.png)
 
-本システムの各専門エージェント（仮説立案、データ加工など）は、単に役割を与えられているだけではありません。その思考と行動は、特定のタスクを高い品質で再現可能にするための極めて詳細な標準操作手順書 **「SOP（Standard Operating Procedure）」** によって規定されています。
+本システムの各専門エージェント（仮説立案、データ加工など）は、単に役割を与えられているだけではありません。その思考と行動は、特定のタスクを高い品質で再現可能にするための極めて詳細な標準操作手順書  **「SOP（Standard Operating Procedure）」** によって規定されています。
 
 プロンプトの設計思想は **Anthropicが提唱する「Skills」や、AWS Strands Agentsの「SOP for Agents」といった最先端のAIエージェント開発手法を強く参考**にしています。
 
