@@ -1,0 +1,140 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1280" height="720" fill="#181818" />
+
+  <!-- Title -->
+  <text x="50" y="60" font-family="'Noto Sans JP', sans-serif" font-size="48" fill="#FFFFFF" font-weight="bold">FUJITSU DDM-Aword CLI</text>
+  <text x="80" y="100" font-family="'Noto Sans JP', sans-serif" font-size="24" fill="#AAAAAA">Autonomous Consulting Architecture</text>
+
+  <!-- Definitions for markers -->
+  <defs>
+    <!-- White Marker -->
+    <marker id="arrowhead-white" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#FFFFFF" />
+    </marker>
+    
+    <!-- Colored Markers -->
+    <marker id="arrowhead-grey" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#A0AEC0" />
+    </marker>
+    <marker id="arrowhead-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#4299E1" />
+    </marker>
+    <marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#48BB78" />
+    </marker>
+    <marker id="arrowhead-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#F56565" />
+    </marker>
+    <marker id="arrowhead-yellow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ECC94B" />
+    </marker>
+    <marker id="arrowhead-teal" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#38B2AC" />
+    </marker>
+  </defs>
+
+  <!-- User Icon -->
+  <g transform="translate(100, 200)">
+    <circle cx="20" cy="20" r="10" fill="#FFFFFF" />
+    <line x1="20" y1="30" x2="20" y2="70" stroke="#FFFFFF" stroke-width="3" />
+    <line x1="20" y1="40" x2="0" y2="60" stroke="#FFFFFF" stroke-width="3" />
+    <line x1="20" y1="40" x2="40" y2="60" stroke="#FFFFFF" stroke-width="3" />
+    <line x1="20" y1="70" x2="0" y2="100" stroke="#FFFFFF" stroke-width="3" />
+    <line x1="20" y1="70" x2="40" y2="100" stroke="#FFFFFF" stroke-width="3" />
+    <text x="20" y="130" font-family="'Noto Sans JP', sans-serif" font-size="18" fill="#FFFFFF" text-anchor="middle">User</text>
+  </g>
+
+  <!-- CLI Box -->
+  <g transform="translate(250, 180)">
+    <rect x="0" y="0" width="280" height="100" rx="15" fill="#2D3748" stroke="#FFFFFF" stroke-width="2" />
+    <text x="140" y="45" font-family="'Noto Sans JP', sans-serif" font-size="18" fill="#FFFFFF" text-anchor="middle">Interactive CLI / UI</text>
+    <text x="140" y="70" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#CBD5E0" text-anchor="middle">(Rich &amp; Prompt Toolkit)</text>
+  </g>
+
+  <!-- Orchestrator Hexagon -->
+  <!-- Center at (715, 380) -->
+  <g transform="translate(565, 250)">
+    <polygon points="75,0 225,0 300,130 225,260 75,260 0,130" fill="#6B46C1" stroke="#FFFFFF" stroke-width="2" />
+    <text x="150" y="120" font-family="'Noto Sans JP', sans-serif" font-size="22" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Orchestrator</text>
+    <text x="150" y="150" font-family="'Noto Sans JP', sans-serif" font-size="18" fill="#FFFFFF" text-anchor="middle">(AWS Strands Agent)</text>
+  </g>
+
+  <!-- Agents -->
+  
+  <!-- Reporting Agent (Grey) - Left -->
+  <!-- Center (290, 380) -->
+  <g transform="translate(220, 310)">
+    <circle cx="70" cy="70" r="70" fill="#A0AEC0" stroke="#FFFFFF" stroke-width="2" />
+    <text x="70" y="65" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#1A202C" text-anchor="middle" font-weight="bold">Reporting</text>
+    <text x="70" y="85" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#1A202C" text-anchor="middle">Agent</text>
+  </g>
+
+  <!-- Strategy Agent (Blue) - Bottom Left -->
+  <!-- Center (290, 610) -->
+  <g transform="translate(220, 540)">
+    <circle cx="70" cy="70" r="70" fill="#4299E1" stroke="#FFFFFF" stroke-width="2" />
+    <text x="70" y="65" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Strategy</text>
+    <text x="70" y="85" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#FFFFFF" text-anchor="middle">Agent</text>
+  </g>
+
+  <!-- Data Processing Agent (Red) - Right -->
+  <!-- Center (1140, 380) -->
+  <g transform="translate(1070, 310)">
+    <circle cx="70" cy="70" r="70" fill="#F56565" stroke="#FFFFFF" stroke-width="2" />
+    <text x="70" y="65" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Data Processing</text>
+    <text x="70" y="85" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#FFFFFF" text-anchor="middle">Agent</text>
+  </g>
+
+  <!-- Hypothesis Agent (Green) - Top Right -->
+  <!-- Center (1140, 150) -->
+  <g transform="translate(1070, 80)">
+    <circle cx="70" cy="70" r="70" fill="#48BB78" stroke="#FFFFFF" stroke-width="2" />
+    <text x="70" y="65" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Hypothesis</text>
+    <text x="70" y="85" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#FFFFFF" text-anchor="middle">Agent</text>
+  </g>
+
+  <!-- Data Scientist Agent (Yellow) - Bottom Right -->
+  <!-- Center (1140, 610) -->
+  <g transform="translate(1070, 540)">
+    <circle cx="70" cy="70" r="70" fill="#ECC94B" stroke="#FFFFFF" stroke-width="2" />
+    <text x="70" y="65" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#1A202C" text-anchor="middle" font-weight="bold">Data Scientist</text>
+    <text x="70" y="85" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#1A202C" text-anchor="middle">Agent</text>
+  </g>
+
+  <!-- Cognitive Memory (Green) - Bottom -->
+  <!-- Center (715, 610) -->
+  <g transform="translate(655, 570)">
+    <path d="M0,20 A60,20 0 0,0 120,20 L120,80 A60,20 0 0,1 0,80 L0,20" fill="#2F855A" stroke="#FFFFFF" stroke-width="2" />
+    <ellipse cx="60" cy="20" rx="60" ry="20" fill="#48BB78" stroke="#FFFFFF" stroke-width="2" />
+    <text x="60" y="65" font-family="'Noto Sans JP', sans-serif" font-size="16" fill="#FFFFFF" text-anchor="middle">Cognitive Memory</text>
+  </g>
+
+  <!-- Connections -->
+  
+  <!-- User to CLI (Solid White) -->
+  <line x1="150" y1="230" x2="240" y2="230" stroke="#FFFFFF" stroke-width="2" marker-end="url(#arrowhead-white)" />
+
+  <!-- CLI to Orchestrator (Solid White, Right-Angle) -->
+  <line x1="530" y1="230" x2="715" y2="230" stroke="#FFFFFF" stroke-width="2" />
+  <line x1="715" y1="230" x2="715" y2="240" stroke="#FFFFFF" stroke-width="2" marker-end="url(#arrowhead-white)" />
+
+  <!-- Orchestrator <-> Reporting (Grey, Dashed) -->
+  <line x1="565" y1="380" x2="370" y2="380" stroke="#A0AEC0" stroke-width="3" stroke-dasharray="5,5" marker-start="url(#arrowhead-grey)" marker-end="url(#arrowhead-grey)" />
+
+  <!-- Orchestrator <-> Data Processing (Red, Dashed) -->
+  <line x1="865" y1="380" x2="1060" y2="380" stroke="#F56565" stroke-width="3" stroke-dasharray="5,5" marker-start="url(#arrowhead-red)" marker-end="url(#arrowhead-red)" />
+
+  <!-- Orchestrator <-> Hypothesis (Green, Dashed) -->
+  <polyline points="865,380 960,380 960,150 1060,150" fill="none" stroke="#48BB78" stroke-width="3" stroke-dasharray="5,5" marker-start="url(#arrowhead-green)" marker-end="url(#arrowhead-green)" />
+
+  <!-- Orchestrator <-> Data Scientist (Yellow, Dashed) -->
+  <polyline points="865,380 960,380 960,610 1060,610" fill="none" stroke="#ECC94B" stroke-width="3" stroke-dasharray="5,5" marker-start="url(#arrowhead-yellow)" marker-end="url(#arrowhead-yellow)" />
+
+  <!-- Orchestrator <-> Strategy (Blue, Dashed) -->
+  <polyline points="565,380 470,380 470,610 370,610" fill="none" stroke="#4299E1" stroke-width="3" stroke-dasharray="5,5" marker-start="url(#arrowhead-blue)" marker-end="url(#arrowhead-blue)" />
+
+  <!-- Orchestrator -> Memory (Green, Solid) -->
+  <line x1="715" y1="510" x2="715" y2="560" stroke="#48BB78" stroke-width="3" marker-end="url(#arrowhead-green)" />
+
+</svg>

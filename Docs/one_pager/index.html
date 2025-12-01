@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FUJITSU DDM-AWord CLI - Executive Summary</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-container">
+        <header>
+            <div>
+                <h1>FUJITSU DDM-AWord CLI</h1>
+                <div class="subtitle">認知科学と統計的検証に基づく自律型経営支援エージェント</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-weight: 700; color: var(--accent-color);">AI Data-Driven Consulting</div>
+                <div style="font-size: 10px; color: var(--text-secondary);">Ver. 2.0.0</div>
+            </div>
+        </header>
+
+        <div class="bento-grid">
+            <!-- Summary -->
+            <div class="card summary-card">
+                <div class="card-title">Executive Summary</div>
+                <div class="card-content">
+                    <p>
+                        <strong>「データの裏付け（エビデンス）に基づいた、実行可能な経営戦略」</strong>を導き出す、次世代のAIコンサルティングツール。<br>
+                        単なる対話型AIではなく、「仮説立案 → データ加工 → 統計的検証 → 戦略策定 →
+                        レポート生成」という一連のコンサルティングプロセスを、複数の専門AIエージェントが自律的に実行します。認知科学に基づくメモリモデルにより、長期的な文脈を理解し、経営層の意思決定を強力に支援します。
+                    </p>
+                </div>
+            </div>
+
+            <!-- Why DDM-AWord -->
+            <div class="card feature-card">
+                <div class="card-title">Why DDM-AWord CLI?</div>
+                <div class="card-content">
+                    <ul>
+                        <li><strong>能動的な課題発見</strong><br>AIがデータをスキャンし、潜在的な課題を自ら提案。</li>
+                        <li><strong>コード実行による自己検証</strong><br>Pythonコードを自ら実装・実行し、統計的に裏付け。</li>
+                        <li><strong>意思決定へのコミット</strong><br>アクションプランを含む戦略レポートを生成。</li>
+                        <li><strong>Spec駆動開発 (SDD)</strong><br>曖昧さを排除した「仕様」ベースの分析プロセス。</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Comparison -->
+            <div class="card comparison-card">
+                <div class="card-title">Conventional AI vs. DDM-AWord CLI</div>
+                <div class="card-content">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>機能・特徴</th>
+                                <th>一般的なAIチャットボット</th>
+                                <th>FUJITSU DDM-AWord CLI</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>課題発見</td>
+                                <td>ユーザーの質問待ち</td>
+                                <td><strong>AIが能動的に提案</strong></td>
+                            </tr>
+                            <tr>
+                                <td>データ分析</td>
+                                <td>コード提示のみ</td>
+                                <td><strong>自ら実行して検証</strong></td>
+                            </tr>
+                            <tr>
+                                <td>根拠</td>
+                                <td>学習データ(確率的)</td>
+                                <td><strong>実データ(統計的裏付け)</strong></td>
+                            </tr>
+                            <tr>
+                                <td>出力</td>
+                                <td>テキスト回答</td>
+                                <td><strong>意思決定可能な戦略レポート</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Architecture -->
+            <div class="card architecture-card">
+                <div class="card-title">Data-Driven Consulting Workflow</div>
+                <div class="card-content">
+                    <div class="img-container">
+                        <img src="../consulting_architecture.png" alt="Architecture Diagram">
+                    </div>
+                    <div style="margin-top: 8px; display: flex; justify-content: space-between; font-size: 9px;">
+                        <div>1. 仮説立案 (Hypothesis)</div>
+                        <div>2. データ加工 (Processing)</div>
+                        <div>3. 仮説検証 (Validation)</div>
+                        <div>4. 戦略立案 (Strategy)</div>
+                        <div>5. レポート (Report)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ensemble -->
+            <div class="card ensemble-card">
+                <div class="card-title">Ensemble Consulting</div>
+                <div class="card-content">
+                    <div class="img-container" style="height: 120px; margin-bottom: 5px;">
+                        <img src="../ensemble_flow.png" alt="Ensemble Flow">
+                    </div>
+                    <p>
+                        <strong>「三人寄れば文殊の知恵」をAIで実現。</strong><br>
+                        複数の独立したAIコンサルタントが並列で分析を行い、相互評価（ピアレビュー）を実施。バイアスを排除し、最も論理的でインパクトのある「最強の仮説」のみを採用したマスターレポートを生成します。
+                    </p>
+                </div>
+            </div>
+
+            <!-- Tech Stack -->
+            <div class="card tech-stack-card">
+                <div class="card-title" style="margin-bottom: 0;">Core Technology</div>
+                <div class="card-content"
+                    style="display: flex; gap: 20px; align-items: center; justify-content: flex-end;">
+                    <span><strong>Framework:</strong> AWS Strands Agent</span>
+                    <span><strong>Lang:</strong> Python 3.10+</span>
+                    <span><strong>LLM:</strong> Multi-Model (Bedrock/OpenAI/Gemini)</span>
+                    <span><strong>Analysis:</strong> pandas / numpy / scipy</span>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            © 2024 FUJITSU DDM-AWord CLI Project. Powered by AWS Strands Agent & Spec-Driven Development.
+        </footer>
+    </div>
+</body>
+
+</html>
