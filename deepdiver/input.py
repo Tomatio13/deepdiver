@@ -17,12 +17,11 @@ from prompt_toolkit.enums import EditingMode
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.key_binding import KeyBindings
 
-from .config import COLORS, COMMANDS, CONSULTING_COMMANDS, SessionState, console
+from .config import COLORS, COMMANDS, SessionState, console
 
 # Regex patterns for context-aware completion
 AT_MENTION_RE = re.compile(r"@(?P<path>(?:[^\s@]|(?<=\\)\s)*)$")
 SLASH_COMMAND_RE = re.compile(r"^/(?P<command>[a-z:]*)$")
-CONSULTING_SUBCOMMAND_RE = re.compile(r"^/consulting:(?P<subcommand>[a-z-]*)$")
 
 
 class FilePathCompleter(Completer):
@@ -80,21 +79,6 @@ class CommandCompleter(Completer):
         """Get command completions when / is at the start."""
         text = document.text_before_cursor
 
-        # Check if we're in consulting: subcommand context
-        consulting_match = CONSULTING_SUBCOMMAND_RE.match(text)
-        if consulting_match:
-            subcommand_fragment = consulting_match.group("subcommand")
-            # Match consulting subcommands
-            for subcmd_name, subcmd_desc in CONSULTING_COMMANDS.items():
-                if subcmd_name.startswith(subcommand_fragment.lower()):
-                    yield Completion(
-                        text=f"consulting:{subcmd_name}",
-                        start_position=-len(subcommand_fragment) - len("consulting:"),
-                        display=subcmd_name,
-                        display_meta=subcmd_desc,
-                    )
-            return
-
         # Use regex to detect /command pattern at start of line
         m = SLASH_COMMAND_RE.match(text)
         if not m:
@@ -112,26 +96,6 @@ class CommandCompleter(Completer):
                     display_meta=cmd_desc,
                 )
         
-        # Also check for consulting: prefix
-        if command_fragment.startswith("consulting:"):
-            subcommand_fragment = command_fragment[len("consulting:"):]
-            for subcmd_name, subcmd_desc in CONSULTING_COMMANDS.items():
-                if subcmd_name.startswith(subcommand_fragment.lower()):
-                    yield Completion(
-                        text=f"consulting:{subcmd_name}",
-                        start_position=-len(subcommand_fragment) - len("consulting:"),
-                        display=subcmd_name,
-                        display_meta=subcmd_desc,
-                    )
-        elif "consulting".startswith(command_fragment.lower()):
-            # User is typing "consulting" - show consulting: as option
-            yield Completion(
-                text="consulting:",
-                start_position=-len(command_fragment),
-                display="consulting:",
-                display_meta="経営コンサルエージェントコマンド",
-            )
-
 
 def parse_file_mentions(text: str) -> tuple[str, list[Path]]:
     """Extract @file mentions and return cleaned text with resolved file paths."""
@@ -265,7 +229,7 @@ def create_prompt_session(assistant_id: str, session_state: SessionState) -> Pro
 
         # Check if we're in a completion context (@ or /)
         text = buffer.document.text_before_cursor
-        if AT_MENTION_RE.search(text) or SLASH_COMMAND_RE.match(text) or CONSULTING_SUBCOMMAND_RE.match(text):
+        if AT_MENTION_RE.search(text) or SLASH_COMMAND_RE.match(text) :
             # Retrigger completion
             buffer.start_completion(select_first=False)
 

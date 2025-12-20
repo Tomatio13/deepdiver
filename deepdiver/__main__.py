@@ -1,4 +1,4 @@
-"""Allow running the CLI as: python -m ddaword_cli"""
+"""Allow running the CLI as: python -m deepdiver_cli"""
 
 from .main import cli_main
 

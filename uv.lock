@@ -666,7 +666,7 @@ wheels = [
 ]
 
 [[package]]
-name = "ddaword-cli"
+name = "deepdiver-cli"
 version = "0.0.8"
 source = { editable = "." }
 dependencies = [

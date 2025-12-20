@@ -1,4 +1,4 @@
-"""Main entry point and CLI loop for the DDAWord CLI."""
+"""Main entry point and CLI loop for the Deepdiver CLI."""
 
 import argparse
 import asyncio
@@ -10,7 +10,7 @@ from strands_tools import editor, environment, file_read, file_write, http_reque
 
 from .agent import create_agent_with_config, list_agents, reset_agent
 from .commands import execute_bash_command, handle_command
-from .config import COLORS, DDAWORD_ASCII, SessionState, console, create_model
+from .config import COLORS, DEEPDIVER_ASCII, SessionState, console, create_model
 from .csv_tool import filter_csv_data
 from .execution import execute_task
 from .input import create_prompt_session
@@ -51,14 +51,14 @@ def check_cli_dependencies():
             print(f"  - {pkg}")
         print("\nInstall the development dependencies with:")
         print("  uv sync")
-        print("\n(If a published package becomes available later, install it via `pip install ddaword-cli`.)")
+        print("\n(If a published package becomes available later, install it via `pip install deepdiver-cli`.)")
         sys.exit(1)
 
 
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="DDAWord - AI Innovation Assistant",
+        description="Deepdiver - AI Innovation Assistant",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=False,
     )
@@ -96,7 +96,7 @@ def parse_args():
 async def simple_cli(agent, assistant_id: str | None, session_state):
     """Main CLI loop."""
     console.clear()
-    console.print(DDAWORD_ASCII, style=f"bold {COLORS['primary']}")
+    console.print(DEEPDIVER_ASCII, style=f"bold {COLORS['primary']}")
     console.print()
 
     console.print("... Ready to Innovation! What would you like to create?", style=COLORS["agent"])
@@ -204,9 +204,6 @@ async def main(assistant_id: str, session_state):
         console.print(f"\n[bold red]❌ Error:[/bold red] {e}\n")
     finally:
         # Cleanup resources
-        from .consulting_agents import close_model
-        await close_model()
-        
         # Close the main model if it has a client
         if model and hasattr(model, "client") and hasattr(model.client, "aclose"):
             await model.client.aclose()

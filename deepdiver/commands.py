@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 
 from .agent import AGENT_ROOT
-from .config import COLORS, DDAWORD_ASCII, console, get_current_model_info
+from .config import COLORS, DEEPDIVER_ASCII, console, get_current_model_info
 from .mcp_tools import get_mcp_server_info
 from .ui import show_interactive_help, toast
 
@@ -84,15 +84,6 @@ async def handle_command(command: str, assistant_id: str = "agent") -> str | boo
         console.print(f"[dim]Configuration file: {mcp_config_path}[/dim]")
         console.print()
         return True
-
-    if cmd_lower == "status":
-        from .consulting_commands import handle_consulting_command
-        return await handle_consulting_command("consulting:status", assistant_id)
-
-    if cmd_lower.startswith("consulting:"):
-        from .consulting_commands import handle_consulting_command
-        return await handle_consulting_command(stripped_command, assistant_id)
-
 
     toast(f"Unknown command: /{cmd_lower}\nType /help for available commands.", kind="warning")
     console.print()

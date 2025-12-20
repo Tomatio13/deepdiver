@@ -5,9 +5,9 @@ This package provides an interactive command-line interface powered by the Stran
 ## Architecture overview
 
 ```
-ddaword_cli/
+deepdiver_cli/
 ├── __init__.py      # Package exports
-├── __main__.py      # Entry point for `python -m ddaword_cli`
+├── __main__.py      # Entry point for `python -m deepdiver_cli`
 ├── agent.py         # Agent lifecycle (storage, prompts, reset)
 ├── commands.py      # Slash commands and shell integration
 ├── config.py        # Colors, console, model selection helpers
@@ -55,11 +55,11 @@ Additional tools can be appended by extending the list before invoking `create_a
 
 ```bash
 # From project root
-uv run python -m ddaword_cli
+uv run python -m deepdiver
 
 # Or install in editable mode
 uv pip install -e .
-ddaword
+deepdiver
 ```
 
 ### Model configuration
@@ -72,4 +72,3 @@ export STRANDS_MODEL_CONFIG='{"model_id": "anthropic.claude-3-5-sonnet-20241022-
 ```
 
 OpenAI/Anthropic style providers can reuse their existing API key variables (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.). If `STRANDS_MODEL_PROVIDER` is omitted, the Strands Agent constructor selects its own default provider.
-
