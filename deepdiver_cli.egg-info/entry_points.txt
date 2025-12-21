@@ -1,0 +1,3 @@
+[console_scripts]
+deepdiver = deepdiver.main:cli_main
+deepdiver-cli = deepdiver.main:cli_main

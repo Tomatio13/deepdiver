@@ -22,8 +22,8 @@ dependencies = [
 ]
 
 [project.scripts]
-deepdiver = "deepdiver_cli:cli_main"
-deepdiver-cli = "deepdiver_cli:cli_main"
+deepdiver = "deepdiver.main:cli_main"
+deepdiver-cli = "deepdiver.main:cli_main"
 
 [dependency-groups]
 test = [
@@ -57,7 +57,7 @@ requires = ["setuptools>=73.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.package-data]
-deepdiver_cli = ["default_agent_prompt.md"]
+deepdiver = ["default_agent_prompt.md"]
 
 [tool.ruff]
 line-length = 100
@@ -113,4 +113,4 @@ disallow_any_generics = false
 warn_return_any = false
 
 [tool.setuptools]
-packages = ["deepdiver", "deepdiver_cli"]
+packages = ["deepdiver"]
