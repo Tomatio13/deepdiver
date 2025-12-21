@@ -15,6 +15,7 @@ from .csv_tool import filter_csv_data
 from .execution import execute_task
 from .input import create_prompt_session
 from .mcp_tools import load_mcp_tools
+from .skills import execute_skills_command, setup_skills_parser
 from .ui import show_help
 
 DEFAULT_TOOLS = [file_read, file_write, editor, shell, http_request, environment,calculator,current_time, filter_csv_data]
@@ -77,6 +78,9 @@ def parse_args():
     reset_parser.add_argument(
         "--target", dest="source_agent", help="Copy prompt from another agent"
     )
+
+    # Skills command
+    setup_skills_parser(subparsers)
 
     # Default interactive mode
     parser.add_argument(
@@ -223,6 +227,8 @@ def cli_main():
             list_agents()
         elif args.command == "reset":
             reset_agent(args.agent, args.source_agent)
+        elif args.command == "skills":
+            execute_skills_command(args)
         else:
             # Create session state from args
             session_state = SessionState(auto_approve=args.auto_approve)

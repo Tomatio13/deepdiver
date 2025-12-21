@@ -45,6 +45,7 @@ COMMANDS = {
     "help": "Show help information",
     "model": "Show current model provider and name",
     "mcp": "Show configured MCP servers",
+    "skills": "List or show available skills",
     "quit": "Exit the CLI",
     "exit": "Exit the CLI",
 }

@@ -6,6 +6,7 @@ import asyncio
 import json
 import re
 import sys
+from pathlib import Path
 from collections.abc import Callable
 from typing import Any, Iterable
 
@@ -18,6 +19,8 @@ from rich.text import Text
 
 from .config import COLORS, console
 from .input import parse_file_mentions
+from .skills.load import list_skills
+from .skills.paths import get_project_skills_dir, get_user_skills_dir
 from .ui import render_todos_panel, toast
 
 
@@ -139,6 +142,64 @@ def _assemble_prompt(user_input: str) -> str:
             console.print(f"[red]Error reading {file_path.name}: {exc}[/red]")
 
     return "\n".join(context_parts)
+
+
+def _extract_skill_prefix(user_input: str, assistant_id: str | None) -> tuple[str | None, str]:
+    match = re.match(r"^\s*\$(?P<name>[a-zA-Z0-9_-]+)\b\s*(?P<rest>.*)$", user_input, re.DOTALL)
+    if not match:
+        return None, user_input
+
+    skill_name = match.group("name")
+    rest = match.group("rest").strip()
+
+    skills = list_skills(
+        user_skills_dir=get_user_skills_dir(assistant_id or "agent"),
+        project_skills_dir=get_project_skills_dir(),
+    )
+    skill = next((s for s in skills if s["name"] == skill_name), None)
+    if not skill:
+        toast(f"Unknown skill: {skill_name}", kind="warning")
+        return None, rest or user_input
+
+    skill_path = Path(skill["path"])
+    try:
+        skill_content = skill_path.read_text()
+    except OSError as exc:
+        toast(f"Failed to read skill: {skill_path} ({exc})", kind="warning")
+        return None, rest or user_input
+
+    skill_prompt = (
+        "## Selected Skill\n"
+        f"Name: {skill_name}\n"
+        f"Source: {skill['source']}\n"
+        f"Path: {skill_path}\n\n"
+        "<skill_instructions>\n"
+        f"{skill_content}\n"
+        "</skill_instructions>\n"
+    )
+    return skill_prompt, rest or ""
+
+
+def _build_skills_discovery_prompt(assistant_id: str | None) -> str | None:
+    skills = list_skills(
+        user_skills_dir=get_user_skills_dir(assistant_id or "agent"),
+        project_skills_dir=get_project_skills_dir(),
+    )
+    if not skills:
+        return None
+
+    lines = [
+        "## Skills (Discovery)",
+        "If a skill is relevant, read its SKILL.md before responding.",
+        "",
+        "Available skills:",
+    ]
+    for skill in skills:
+        lines.append(
+            f"- {skill['name']}: {skill['description']} (path: {skill['path']})"
+        )
+
+    return "\n".join(lines)
 
 
 def _stringify_response(response: Any) -> str:
@@ -576,7 +637,17 @@ async def execute_task(
 ):
     """Execute a task by delegating to the Strands agent."""
 
-    final_input = _assemble_prompt(user_input)
+    skill_prompt, cleaned_input = _extract_skill_prefix(user_input, assistant_id)
+    final_input = _assemble_prompt(cleaned_input)
+
+    if skill_prompt:
+        final_input = f"{skill_prompt}\n\n{final_input}" if final_input else skill_prompt
+    else:
+        discovery_prompt = _build_skills_discovery_prompt(assistant_id)
+        if discovery_prompt:
+            final_input = (
+                f"{discovery_prompt}\n\n{final_input}" if final_input else discovery_prompt
+            )
     
     # 参考コードのパターンに従い、with文でstatusを管理
     # メッセージの最後に\nを追加して、ステータス終了後に改行が入るようにする
@@ -611,4 +682,3 @@ async def execute_task(
                 console.print(render_todos_panel(todos, max_completed=3))
             
             console.print()
-

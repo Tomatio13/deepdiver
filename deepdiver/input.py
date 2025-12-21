@@ -22,6 +22,8 @@ from .config import COLORS, COMMANDS, SessionState, console
 # Regex patterns for context-aware completion
 AT_MENTION_RE = re.compile(r"@(?P<path>(?:[^\s@]|(?<=\\)\s)*)$")
 SLASH_COMMAND_RE = re.compile(r"^/(?P<command>[a-z:]*)$")
+SKILLS_COMMAND_RE = re.compile(r"^/skills(?:\s+(?P<name>[a-zA-Z0-9_-]*))?$")
+SKILL_DOLLAR_RE = re.compile(r"^\$(?P<name>[a-zA-Z0-9_-]*)$")
 
 
 class FilePathCompleter(Completer):
@@ -96,6 +98,73 @@ class CommandCompleter(Completer):
                     display_meta=cmd_desc,
                 )
         
+
+class SkillsCompleter(Completer):
+    """Activate skills completion only when line starts with '/skills '."""
+
+    def __init__(self, assistant_id: str):
+        self.assistant_id = assistant_id
+
+    def get_completions(self, document, complete_event):
+        text = document.text_before_cursor
+
+        m = SKILLS_COMMAND_RE.match(text)
+        if not m:
+            return
+
+        fragment = m.group("name") or ""
+
+        from .skills.load import list_skills
+        from .skills.paths import get_project_skills_dir, get_user_skills_dir
+
+        skills = list_skills(
+            user_skills_dir=get_user_skills_dir(self.assistant_id),
+            project_skills_dir=get_project_skills_dir(),
+        )
+
+        for skill in skills:
+            name = skill["name"]
+            if name.startswith(fragment):
+                yield Completion(
+                    text=f"${name} ",
+                    start_position=-len(text),
+                    display=f"${name}",
+                    display_meta=skill["description"],
+                )
+
+
+class DollarSkillsCompleter(Completer):
+    """Complete $skill names when line starts with '$'."""
+
+    def __init__(self, assistant_id: str):
+        self.assistant_id = assistant_id
+
+    def get_completions(self, document, complete_event):
+        text = document.text_before_cursor
+        m = SKILL_DOLLAR_RE.match(text)
+        if not m:
+            return
+
+        fragment = m.group("name") or ""
+
+        from .skills.load import list_skills
+        from .skills.paths import get_project_skills_dir, get_user_skills_dir
+
+        skills = list_skills(
+            user_skills_dir=get_user_skills_dir(self.assistant_id),
+            project_skills_dir=get_project_skills_dir(),
+        )
+
+        for skill in skills:
+            name = skill["name"]
+            if name.startswith(fragment):
+                yield Completion(
+                    text=name,
+                    start_position=-len(fragment),
+                    display=f"${name}",
+                    display_meta=skill["description"],
+                )
+
 
 def parse_file_mentions(text: str) -> tuple[str, list[Path]]:
     """Extract @file mentions and return cleaned text with resolved file paths."""
@@ -252,7 +321,14 @@ def create_prompt_session(assistant_id: str, session_state: SessionState) -> Pro
         message=HTML(f'<style fg="{COLORS["user"]}">></style> '),
         multiline=True,  # Keep multiline support but Enter submits
         key_bindings=kb,
-        completer=merge_completers([CommandCompleter(), FilePathCompleter()]),
+        completer=merge_completers(
+            [
+                CommandCompleter(),
+                SkillsCompleter(assistant_id),
+                DollarSkillsCompleter(assistant_id),
+                FilePathCompleter(),
+            ]
+        ),
         editing_mode=EditingMode.EMACS,
         complete_while_typing=True,  # Show completions as you type
         complete_in_thread=True,  # Async completion prevents menu freezing

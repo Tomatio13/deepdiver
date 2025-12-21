@@ -6,7 +6,51 @@ from pathlib import Path
 from .agent import AGENT_ROOT
 from .config import COLORS, DEEPDIVER_ASCII, console, get_current_model_info
 from .mcp_tools import get_mcp_server_info
+from .skills.load import list_skills
+from .skills.paths import get_project_skills_dir, get_user_skills_dir
 from .ui import show_interactive_help, toast
+
+
+def _print_skills_list(skills: list[dict]) -> None:
+    if not skills:
+        console.print("[yellow]No skills found.[/yellow]")
+        console.print(
+            "[dim]Create skills in ~/.deepdriver/<agent>/skills/ or .deepdiver/skills/[/dim]",
+            style=COLORS["dim"],
+        )
+        return
+
+    console.print("\n[bold]Available Skills:[/bold]\n", style=COLORS["primary"])
+    for idx, skill in enumerate(skills, 1):
+        source = "project" if skill["source"] == "project" else "user"
+        console.print(f"  {idx}. [bold]${skill['name']}[/bold] [{source}]", style=COLORS["primary"])
+        console.print(f"     {skill['description']}", style=COLORS["dim"])
+        console.print(f"     {skill['path']}", style=COLORS["dim"])
+    console.print()
+    console.print(
+        "[dim]Type /skills then Tab to insert $skill, or use /skills <name> for details.[/dim]",
+        style=COLORS["dim"],
+    )
+    console.print()
+
+
+def _print_skill_detail(skill: dict) -> None:
+    skill_path = Path(skill["path"])
+    if not skill_path.exists():
+        toast(f"Skill file not found: {skill_path}", kind="warning")
+        console.print()
+        return
+
+    skill_content = skill_path.read_text()
+    console.print(
+        f"\n[bold]Skill: {skill['name']}[/bold] ({skill['source']})\n",
+        style=COLORS["primary"],
+    )
+    console.print(f"[bold]Description:[/bold] {skill['description']}\n", style=COLORS["dim"])
+    console.print(f"[bold]Location:[/bold] {skill_path}\n", style=COLORS["dim"])
+    console.print("[bold]Full SKILL.md Content:[/bold]\n", style=COLORS["primary"])
+    console.print(skill_content, style=COLORS["dim"])
+    console.print()
 
 
 async def handle_command(command: str, assistant_id: str = "agent") -> str | bool:
@@ -20,7 +64,7 @@ async def handle_command(command: str, assistant_id: str = "agent") -> str | boo
     if cmd_lower == "clear":
         # Clear screen and show fresh UI
         console.clear()
-        console.print(DDAWORD_ASCII, style=f"bold {COLORS['primary']}")
+        console.print(DEEPDIVER_ASCII, style=f"bold {COLORS['primary']}")
         console.print()
         console.print(
             "... Fresh start! Screen cleared. Conversation state will continue in the current session.",
@@ -83,6 +127,48 @@ async def handle_command(command: str, assistant_id: str = "agent") -> str | boo
 
         console.print(f"[dim]Configuration file: {mcp_config_path}[/dim]")
         console.print()
+        return True
+
+    if cmd_lower.startswith("skills"):
+        parts = stripped_command.split(maxsplit=1)
+        arg = parts[1] if len(parts) > 1 else ""
+
+        user_skills_dir = get_user_skills_dir(assistant_id)
+        project_skills_dir = get_project_skills_dir()
+        skills = list_skills(
+            user_skills_dir=user_skills_dir,
+            project_skills_dir=project_skills_dir,
+        )
+
+        if not arg or arg == "list":
+            _print_skills_list(skills)
+            return True
+
+        if arg == "help":
+            console.print("\n[bold]Skills Command Usage:[/bold]", style=COLORS["primary"])
+            console.print("  /skills                List skills", style=COLORS["dim"])
+            console.print("  /skills list           List skills", style=COLORS["dim"])
+            console.print("  /skills <number>       Show skill details", style=COLORS["dim"])
+            console.print("  /skills <name>         Show skill details", style=COLORS["dim"])
+            console.print("  $<name> <request>      Run with a skill", style=COLORS["dim"])
+            console.print()
+            return True
+
+        # Try numeric index selection
+        selected: dict | None = None
+        if arg.isdigit():
+            index = int(arg) - 1
+            if 0 <= index < len(skills):
+                selected = skills[index]
+        else:
+            selected = next((s for s in skills if s["name"] == arg), None)
+
+        if not selected:
+            toast(f"Skill not found: {arg}", kind="warning")
+            _print_skills_list(skills)
+            return True
+
+        _print_skill_detail(selected)
         return True
 
     toast(f"Unknown command: /{cmd_lower}\nType /help for available commands.", kind="warning")

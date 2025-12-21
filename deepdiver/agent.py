@@ -9,8 +9,8 @@ from typing import Any, Sequence
 from strands import Agent
 
 from .config import COLORS, console, get_default_coding_instructions
-
-AGENT_ROOT = Path.home() / ".strands-agents-cli"
+from .paths import AGENT_ROOT
+from .skills.prompt import build_skills_prompt
 MEMORY_DIRNAME = "memories"
 
 
@@ -37,7 +37,7 @@ def list_agents() -> None:
     if not AGENT_ROOT.exists() or not any(AGENT_ROOT.iterdir()):
         console.print("[yellow]No agents found.[/yellow]")
         console.print(
-            "[dim]Agents will be created in ~/.strands-agents-cli/ when first used.[/dim]",
+            "[dim]Agents will be created in ~/.deepdriver/ when first used.[/dim]",
             style=COLORS["dim"],
         )
         return
@@ -109,6 +109,10 @@ def _base_cli_prompt(agent_dir: Path) -> str:
 def _build_system_prompt(agent_dir: Path) -> str:
     base_prompt = _base_cli_prompt(agent_dir)
     agent_md = (agent_dir / "AGENT.md").read_text().strip()
+    skills_prompt = build_skills_prompt(agent_dir.name)
+
+    if skills_prompt:
+        base_prompt = f"{base_prompt}\n\n{skills_prompt}"
 
     if agent_md:
         return f"{base_prompt}\n\n<agent_memory>\n{agent_md}\n</agent_memory>"

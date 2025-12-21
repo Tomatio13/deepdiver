@@ -169,7 +169,7 @@ GOOGLE_API_KEY=your-google-api-key
 
 ## エージェント管理
 
-CLI は複数のエージェントプロファイルを管理できます。各エージェントは `~/.strands-agents-cli/<agent-name>/` に保存され、独立したメモリとプロンプト設定を持ちます。
+CLI は複数のエージェントプロファイルを管理できます。各エージェントは `~/.deepdriver/<agent-name>/` に保存され、独立したメモリとプロンプト設定を持ちます。
 
 ### エージェントの一覧表示
 
@@ -204,3 +204,31 @@ CLI には以下のデフォルトツールが組み込まれています:
 - `filter_csv_data` - CSV データのフィルタリング
 
 MCP (Model Context Protocol) サーバーが設定されている場合、追加のツールも利用可能です。
+
+## Skills
+
+Deepdiver は Agent Skills の仕組みを使って、専門的な手順やワークフローを追加できます。Skills は `SKILL.md` を含むフォルダとして管理され、必要なときにだけ読み込まれる **progressive disclosure** 方式です。
+
+### ディレクトリ構成
+
+- ユーザー技能: `~/.deepdriver/<agent>/skills/`
+- プロジェクト技能: `.deepdiver/skills/`（git ルート配下）
+
+### 使い方
+
+- `/skills` でスキル一覧を表示
+- `/skills` → Tab で `$skill ` を挿入して続けて入力
+- `$plan 移行計画を立案してください。` のように指定すると、該当スキルの `SKILL.md` を読み込みます
+- `$` を付けない場合は、LLM が文脈から自動選択します（該当時に SKILL.md を読む前提）
+
+### SKILL.md の例
+
+```md
+---
+name: plan
+description: Generate a plan for how an agent should accomplish a complex coding task.
+---
+
+# Plan
+...
+```

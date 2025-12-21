@@ -219,7 +219,7 @@ def show_help() -> None:
 
     console.print("[bold]Agent Storage:[/bold]", style=COLORS["primary"])
     console.print(
-        "  Agents are stored in: ~/.strands-agents-cli/AGENT_NAME/", style=COLORS["dim"]
+        "  Agents are stored in: ~/.deepdriver/AGENT_NAME/", style=COLORS["dim"]
     )
     console.print(
         "  Each agent has an AGENT.md file and an optional memories/ directory",
@@ -241,5 +241,6 @@ def show_help() -> None:
     console.print("[bold]Interactive Commands:[/bold]", style=COLORS["primary"])
     console.print("  /help           Show this summary", style=COLORS["dim"])
     console.print("  /clear          Clear screen", style=COLORS["dim"])
+    console.print("  /skills         List or show skills", style=COLORS["dim"])
     console.print("  /quit, /exit    Exit the session", style=COLORS["dim"])
     console.print()
