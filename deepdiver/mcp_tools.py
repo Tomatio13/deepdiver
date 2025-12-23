@@ -8,6 +8,7 @@ import os
 import sys
 import warnings
 from pathlib import Path
+from types import MethodType
 from typing import Any
 
 from strands.tools.mcp import MCPClient
@@ -326,6 +327,37 @@ def create_mcp_client(server_name: str, server_config: dict[str, Any]) -> MCPCli
     return None
 
 
+def _wrap_mcp_client(client: MCPClient, server_name: str) -> MCPClient:
+    """Wrap MCP client with error handling so failed servers don't break the CLI."""
+    if getattr(client, "_deepdiver_safe_wrapped", False):
+        return client
+
+    original_load_tools = client.load_tools
+
+    async def safe_load_tools(self, *args, **kwargs):
+        try:
+            return await original_load_tools(*args, **kwargs)
+        except ToolProviderException as exc:
+            console.print(
+                "[yellow]"
+                f"Warning: MCP server '{server_name}' is unavailable "
+                f"({exc}). Skipping its tools."
+                "[/yellow]"
+            )
+            return []
+        except Exception as exc:  # noqa: BLE001
+            console.print(
+                "[yellow]"
+                f"Warning: Unexpected error while loading MCP tools from '{server_name}': {exc}"
+                "[/yellow]"
+            )
+            return []
+
+    client.load_tools = MethodType(safe_load_tools, client)
+    setattr(client, "_deepdiver_safe_wrapped", True)
+    return client
+
+
 def get_mcp_server_info(assistant_id: str) -> list[dict[str, Any]]:
     """Get information about configured MCP servers.
 
@@ -398,6 +430,7 @@ def load_mcp_tools(assistant_id: str) -> list[MCPClient]:
 
         client = create_mcp_client(server_name, server_config)
         if client:
+            client = _wrap_mcp_client(client, server_name)
             # Use MCPClient directly - it implements ToolProvider interface
             mcp_clients.append(client)
             console.print(
