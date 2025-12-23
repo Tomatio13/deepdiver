@@ -37,7 +37,7 @@ def list_agents() -> None:
     if not AGENT_ROOT.exists() or not any(AGENT_ROOT.iterdir()):
         console.print("[yellow]No agents found.[/yellow]")
         console.print(
-            "[dim]Agents will be created in ~/.deepdriver/ when first used.[/dim]",
+            "[dim]Agents will be created in ~/.deepdiver/ when first used.[/dim]",
             style=COLORS["dim"],
         )
         return

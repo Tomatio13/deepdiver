@@ -19,7 +19,7 @@ deepdiver_cli/
 
 ### Key modules
 
-- **`agent.py`** – Creates Strands `Agent` instances backed by `~/.deepdriver/<agent>/`. Handles listing/resetting profiles and composing system prompts that embed `agent.md` instructions.
+- **`agent.py`** – Creates Strands `Agent` instances backed by `~/.deepdiver/<agent>/`. Handles listing/resetting profiles and composing system prompts that embed `agent.md` instructions.
 - **`config.py`** – Loads environment variables, provides shared colors/console objects, and resolves model providers via `STRANDS_MODEL_PROVIDER` / `STRANDS_MODEL_CONFIG`.
 - **`execution.py`** – Normalises requests to the agent. Adds referenced file context, uses streaming when available, and falls back to blocking invocation otherwise.
 - **`commands.py`** – Implements `/help`, `/clear`, and bang-prefixed shell commands.
@@ -29,7 +29,7 @@ deepdiver_cli/
 
 ## Agent storage & prompts
 
-- Agents live under `~/.deepdriver/<agent-name>/`.
+- Agents live under `~/.deepdiver/<agent-name>/`.
 - `agent.md` stores long-lived instructions. A `memories/` subdirectory is created for additional context files.
 - Resetting an agent deletes the directory and restores the default prompt (or copies another agent’s instructions).
 

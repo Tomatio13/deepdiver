@@ -169,7 +169,7 @@ GOOGLE_API_KEY=your-google-api-key
 
 ## エージェント管理
 
-CLI は複数のエージェントプロファイルを管理できます。各エージェントは `~/.deepdriver/<agent-name>/` に保存され、独立したメモリとプロンプト設定を持ちます。
+CLI は複数のエージェントプロファイルを管理できます。各エージェントは `~/.deepdiver/<agent-name>/` に保存され、独立したメモリとプロンプト設定を持ちます。
 
 ### エージェントの一覧表示
 
@@ -211,7 +211,7 @@ Deepdiver は Agent Skills の仕組みを使って、専門的な手順やワ�
 
 ### ディレクトリ構成
 
-- ユーザー技能: `~/.deepdriver/<agent>/skills/`
+- ユーザー技能: `~/.deepdiver/<agent>/skills/`
 - プロジェクト技能: `.deepdiver/skills/`（git ルート配下）
 
 ### 使い方

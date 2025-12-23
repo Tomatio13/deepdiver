@@ -15,7 +15,7 @@ def _print_skills_list(skills: list[dict]) -> None:
     if not skills:
         console.print("[yellow]No skills found.[/yellow]")
         console.print(
-            "[dim]Create skills in ~/.deepdriver/<agent>/skills/ or .deepdiver/skills/[/dim]",
+            "[dim]Create skills in ~/.deepdiver/<agent>/skills/ or .deepdiver/skills/[/dim]",
             style=COLORS["dim"],
         )
         return

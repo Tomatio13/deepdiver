@@ -6,11 +6,11 @@ This middleware implements Anthropic's "Agent Skills" pattern with progressive d
 3. Agent reads full SKILL.md content when relevant to a task
 
 Skills directory structure (per-agent + project):
-User-level: ~/.deepdriver/{AGENT_NAME}/skills/
+User-level: ~/.deepdiver/{AGENT_NAME}/skills/
 Project-level: {PROJECT_ROOT}/.deepdiver/skills/
 
 Example structure:
-~/.deepdriver/{AGENT_NAME}/skills/
+~/.deepdiver/{AGENT_NAME}/skills/
 ├── web-research/
 │   ├── SKILL.md        # Required: YAML frontmatter + instructions
 │   └── helper.py       # Optional: supporting files
@@ -108,7 +108,7 @@ class SkillsMiddleware(AgentMiddleware):
     - Agent reads full SKILL.md content when a skill is relevant (progressive disclosure)
 
     Supports both user-level and project-level skills:
-    - User skills: ~/.deepdriver/{AGENT_NAME}/skills/
+    - User skills: ~/.deepdiver/{AGENT_NAME}/skills/
     - Project skills: {PROJECT_ROOT}/.deepdiver/skills/
     - Project skills override user skills with the same name
 
@@ -140,7 +140,7 @@ class SkillsMiddleware(AgentMiddleware):
             Path(project_skills_dir).expanduser() if project_skills_dir else None
         )
         # Store display paths for prompts
-        self.user_skills_display = f"~/.deepdriver/{assistant_id}/skills"
+        self.user_skills_display = f"~/.deepdiver/{assistant_id}/skills"
         self.system_prompt_template = SKILLS_SYSTEM_PROMPT
 
     def _format_skills_locations(self) -> str:

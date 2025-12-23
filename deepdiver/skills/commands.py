@@ -127,7 +127,7 @@ def _list(agent: str, *, project: bool = False) -> None:
         if not skills:
             console.print("[yellow]No skills found.[/yellow]")
             console.print(
-                "[dim]Skills will be created in ~/.deepdriver/agent/skills/ when you add them.[/dim]",
+                "[dim]Skills will be created in ~/.deepdiver/agent/skills/ when you add them.[/dim]",
                 style=COLORS["dim"],
             )
             console.print(
@@ -300,7 +300,7 @@ This skill directory can include supporting files referenced in the instructions
         "   - web-research: Structured research workflow\n"
         "   - langgraph-docs: LangGraph documentation lookup\n"
         "\n"
-        "   Copy an example: cp -r examples/skills/web-research ~/.deepdriver/agent/skills/\n",
+        "   Copy an example: cp -r examples/skills/web-research ~/.deepdiver/agent/skills/\n",
         style=COLORS["dim"],
     )
 

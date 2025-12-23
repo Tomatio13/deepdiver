@@ -219,7 +219,7 @@ def show_help() -> None:
 
     console.print("[bold]Agent Storage:[/bold]", style=COLORS["primary"])
     console.print(
-        "  Agents are stored in: ~/.deepdriver/AGENT_NAME/", style=COLORS["dim"]
+        "  Agents are stored in: ~/.deepdiver/AGENT_NAME/", style=COLORS["dim"]
     )
     console.print(
         "  Each agent has an AGENT.md file and an optional memories/ directory",

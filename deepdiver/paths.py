@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-AGENT_ROOT = Path.home() / ".deepdriver"
+AGENT_ROOT = Path.home() / ".deepdiver"
 
 
 def find_project_root(start: Path | None = None) -> Path | None:
