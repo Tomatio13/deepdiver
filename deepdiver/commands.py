@@ -6,6 +6,9 @@ from pathlib import Path
 from .agent import AGENT_ROOT
 from .config import COLORS, DEEPDIVER_ASCII, console, get_current_model_info
 from .mcp_tools import get_mcp_server_info
+from .subagents.load import get_subagent, list_subagents
+from .subagents.paths import get_project_subagents_dir, get_user_subagents_dir
+from .subagents.runtime import run_subagent
 from .skills.load import list_skills
 from .skills.paths import get_project_skills_dir, get_user_skills_dir
 from .ui import show_interactive_help, toast
@@ -169,6 +172,167 @@ async def handle_command(command: str, assistant_id: str = "agent") -> str | boo
             return True
 
         _print_skill_detail(selected)
+        return True
+
+    if cmd_lower.startswith("subagents") or cmd_lower.startswith("agents"):
+        # /agents is an alias for /subagents
+        parts = stripped_command.split(maxsplit=1)
+        argline = parts[1] if len(parts) > 1 else ""
+
+        user_dir = get_user_subagents_dir()
+        project_dir = get_project_subagents_dir()
+        subs = list_subagents(user_subagents_dir=user_dir, project_subagents_dir=project_dir)
+
+        def _print_subagents_list() -> None:
+            if not subs:
+                console.print("[yellow]No subagents found.[/yellow]")
+                console.print(
+                    f"[dim]Create subagents in {user_dir}/ or {project_dir}/[/dim]",
+                    style=COLORS["dim"],
+                )
+                console.print()
+                return
+            console.print("\n[bold]Available Subagents:[/bold]\n", style=COLORS["primary"])
+            for idx, s in enumerate(subs, 1):
+                console.print(
+                    f"  {idx}. [bold]{s['name']}[/bold] [{s['source']}]",
+                    style=COLORS["primary"],
+                )
+                console.print(f"     {s['description']}", style=COLORS["dim"])
+                console.print(f"     {s['path']}", style=COLORS["dim"])
+            console.print()
+            console.print(
+                "[dim]Usage:\n"
+                "  /subagents                 List subagents\n"
+                "  /subagents <name> <task>    Run subagent\n"
+                "  /subagents resume <run_id> <name> <task>  Resume\n"
+                "[/dim]",
+                style=COLORS["dim"],
+            )
+            console.print()
+
+        if not argline or argline.strip() in ("list",):
+            _print_subagents_list()
+            return True
+
+        if argline.strip() == "help":
+            _print_subagents_list()
+            return True
+
+        # resume form: resume <run_id> <name> <task...>
+        if argline.lower().startswith("resume "):
+            tokens = argline.split(maxsplit=3)
+            if len(tokens) < 4:
+                toast("Usage: /subagents resume <run_id> <name> <task>", kind="warning")
+                _print_subagents_list()
+                return True
+            _, run_id, name, task = tokens
+            sub = get_subagent(name)
+            if not sub:
+                toast(f"Subagent not found: {name}", kind="warning")
+                _print_subagents_list()
+                return True
+
+            from .config import create_model
+            from strands_tools import (
+                calculator,
+                current_time,
+                editor,
+                environment,
+                file_read,
+                file_write,
+                http_request,
+                shell,
+            )
+
+            from .csv_tool import filter_csv_data
+            from .mcp_tools import load_mcp_tools
+
+            model = create_model()
+            tools = [
+                file_read,
+                file_write,
+                editor,
+                shell,
+                http_request,
+                environment,
+                calculator,
+                current_time,
+                filter_csv_data,
+            ]
+            tools.extend(load_mcp_tools(assistant_id))
+
+            run, output = await run_subagent(
+                subagent=sub,
+                task=task,
+                assistant_id=assistant_id,
+                model=model,
+                tools=tools,
+                resume_from=run_id,
+            )
+            console.print()
+            console.print(f"[bold]Run ID:[/bold] {run.run_id}", style=COLORS["primary"])
+            console.print(f"[dim]Transcript: {run.transcript_path}[/dim]", style=COLORS["dim"])
+            console.print()
+            console.print(output, style=COLORS["agent"])
+            console.print()
+            return True
+
+        # run form: <name> <task...>
+        tokens = argline.split(maxsplit=1)
+        if len(tokens) < 2:
+            toast("Usage: /subagents <name> <task>", kind="warning")
+            _print_subagents_list()
+            return True
+        name, task = tokens
+        sub = get_subagent(name)
+        if not sub:
+            toast(f"Subagent not found: {name}", kind="warning")
+            _print_subagents_list()
+            return True
+
+        from .config import create_model
+        from strands_tools import (
+            calculator,
+            current_time,
+            editor,
+            environment,
+            file_read,
+            file_write,
+            http_request,
+            shell,
+        )
+
+        from .csv_tool import filter_csv_data
+        from .mcp_tools import load_mcp_tools
+
+        model = create_model()
+        tools = [
+            file_read,
+            file_write,
+            editor,
+            shell,
+            http_request,
+            environment,
+            calculator,
+            current_time,
+            filter_csv_data,
+        ]
+        tools.extend(load_mcp_tools(assistant_id))
+
+        run, output = await run_subagent(
+            subagent=sub,
+            task=task,
+            assistant_id=assistant_id,
+            model=model,
+            tools=tools,
+        )
+        console.print()
+        console.print(f"[bold]Run ID:[/bold] {run.run_id}", style=COLORS["primary"])
+        console.print(f"[dim]Transcript: {run.transcript_path}[/dim]", style=COLORS["dim"])
+        console.print()
+        console.print(output, style=COLORS["agent"])
+        console.print()
         return True
 
     toast(f"Unknown command: /{cmd_lower}\nType /help for available commands.", kind="warning")

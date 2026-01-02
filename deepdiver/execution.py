@@ -23,6 +23,8 @@ from .skills.load import list_skills
 from .skills.paths import get_project_skills_dir, get_user_skills_dir
 from .ui import render_todos_panel, toast
 
+_PRINTED_TOOL_PARAMS_IDS: set[str] = set()
+
 
 def looks_like_markdown(text: str) -> bool:
     """Check if text looks like markdown format.
@@ -434,11 +436,35 @@ def _handle_tool_use(
     """
     tool_name = tool_use.get("name")
     tool_use_id = tool_use.get("toolUseId")
+    tool_input = tool_use.get("input")
+    # NOTE: tool_use is often delivered multiple times (streaming). We print params once per toolUseId.
     
     # ツール実行開始時: ステータス表示を開始
     if tool_name:
         session_state.set_thinking_status(None)  # 思考ステータスをクリア
         session_state.set_tool_status(f"Tool executing: {tool_name}...")
+        # Tool parameters (same style as "Loaded MCP server: ...")
+        if tool_input is not None and tool_use_id and tool_use_id not in _PRINTED_TOOL_PARAMS_IDS:
+            normalized: Any = tool_input
+            if isinstance(tool_input, str):
+                s = tool_input.strip()
+                if not s:
+                    normalized = None
+                elif s.startswith("{") or s.startswith("["):
+                    try:
+                        normalized = json.loads(s)
+                    except json.JSONDecodeError:
+                        normalized = None  # don't print partial JSON fragments
+                else:
+                    normalized = None
+
+            if isinstance(normalized, (dict, list)):
+                try:
+                    args_json = json.dumps(normalized, ensure_ascii=False, default=str)
+                except Exception:
+                    args_json = str(normalized)
+                console.print(f"[dim]{args_json}[/dim]")
+                _PRINTED_TOOL_PARAMS_IDS.add(tool_use_id)
     
     if tool_name and not session_state.auto_approve:
         # 同期的に確認を求める（コールバックハンドラーは同期的）

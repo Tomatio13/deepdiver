@@ -11,6 +11,7 @@ from strands import Agent
 from .config import COLORS, console, get_default_coding_instructions
 from .paths import AGENT_ROOT
 from .skills.prompt import build_skills_prompt
+from .subagents.prompt import build_subagents_prompt
 MEMORY_DIRNAME = "memories"
 
 
@@ -46,6 +47,9 @@ def list_agents() -> None:
 
     for agent_path in sorted(AGENT_ROOT.iterdir()):
         if not agent_path.is_dir():
+            continue
+        # Reserved directory names used by other features (not actual agent profiles)
+        if agent_path.name in {"subagents"}:
             continue
         agent_name = agent_path.name
         agent_md = agent_path / "AGENT.md"
@@ -108,13 +112,23 @@ def _base_cli_prompt(agent_dir: Path) -> str:
 
 def _build_system_prompt(agent_dir: Path) -> str:
     base_prompt = _base_cli_prompt(agent_dir)
+    base_instructions = get_default_coding_instructions().strip()
     agent_md = (agent_dir / "AGENT.md").read_text().strip()
     skills_prompt = build_skills_prompt(agent_dir.name)
+    subagents_prompt = build_subagents_prompt()
+
+    # Always include the immutable base instructions (so updates to default_agent_prompt.md take effect
+    # even for existing agent profiles).
+    if base_instructions:
+        base_prompt = f"{base_prompt}\n\n<base_instructions>\n{base_instructions}\n</base_instructions>"
 
     if skills_prompt:
         base_prompt = f"{base_prompt}\n\n{skills_prompt}"
+    if subagents_prompt:
+        base_prompt = f"{base_prompt}\n\n{subagents_prompt}"
 
-    if agent_md:
+    # If AGENT.md is identical to the base instructions, treat it as empty to avoid duplication.
+    if agent_md and agent_md != base_instructions:
         return f"{base_prompt}\n\n<agent_memory>\n{agent_md}\n</agent_memory>"
     return base_prompt
 

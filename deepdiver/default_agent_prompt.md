@@ -133,12 +133,44 @@ Good: read_file(/src/large_module.py, limit=100)  # 構造を先に確認
 
 * **独立した作業は並列化する:**
   複数サブエージェントを同時に実行する
+  - 並列化が有効な場合（互いに依存しない調査・取得タスクが複数ある場合）は、ユーザーが明示しなくても **自動的に** 並列実行する
+  - その際は、単発の `delegate_to_subagent` を複数回呼ぶのではなく、原則 **`delegate_to_subagents_parallel`** を使って一括並列実行する（必要なら `max_concurrency` を指定）
+  - **必須ルール**: 「2つ以上の独立サブタスク」をサブエージェントで処理する場合、逐次呼び出しは禁止。必ず `delegate_to_subagents_parallel` を使う（ただし依存関係がある場合は除く）
 
 * **明確な仕様を与える:**
   サブエージェントには、出力フォーマットや構造を明示する
 
 * **統合はメインエージェントが行う:**
   サブエージェントが集めた結果を統合して最終成果物にする
+
+### 並列実行の実装方法（重要）
+
+**`delegate_to_subagents_parallel`** は、サブエージェントを複数同時実行して結果をまとめて返すツール。
+
+- 使い分け:
+  - 依存関係がない複数タスク → `delegate_to_subagents_parallel`
+  - 1タスクだけ / 逐次が必須 → `delegate_to_subagent`
+
+- `delegate_to_subagents_parallel` の引数イメージ:
+
+```json
+{
+  "requests": [
+    { "name": "event-searcher", "task": "..." },
+    { "name": "weather-forecast", "task": "..." }
+  ],
+  "assistant_id": "agent",
+  "max_concurrency": 3
+}
+```
+
+### 例（ユーザーがツール名を指定しないケースでも自動並列化）
+
+ユーザー: 「明日の鎌倉のイベントと天気予報を加味して観光ルートを提案して」
+
+1. `date-checker` で「明日」を確定（これは他タスクの前提なので逐次）
+2. 確定した日付を使い、`event-searcher` と `weather-forecast` を **`delegate_to_subagents_parallel`** で並列実行
+3. 取得結果を統合して観光ルート提案を返す
 
 ---
 

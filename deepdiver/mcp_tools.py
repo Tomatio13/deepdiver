@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from strands.tools.mcp import MCPClient
+from strands.tools.registry import ToolProvider
 
 from .agent import AGENT_ROOT
 from .config import console
@@ -60,6 +61,17 @@ httpcore_logger = logging.getLogger("httpcore")
 httpcore_logger.setLevel(logging.ERROR)
 for handler in httpcore_logger.handlers[:]:
     httpcore_logger.removeHandler(handler)
+
+# Suppress noisy SSE stack traces from MCP client internals (they are often transient)
+mcp_sse_logger = logging.getLogger("mcp.client.sse")
+mcp_sse_logger.setLevel(logging.CRITICAL)
+for handler in mcp_sse_logger.handlers[:]:
+    mcp_sse_logger.removeHandler(handler)
+
+mcp_client_logger = logging.getLogger("mcp.client")
+mcp_client_logger.setLevel(logging.CRITICAL)
+for handler in mcp_client_logger.handlers[:]:
+    mcp_client_logger.removeHandler(handler)
 
 # Suppress MCP client timeout and connection errors
 # These occur when MCP servers timeout or disconnect
@@ -207,6 +219,50 @@ if stdio_client is None and sse_client is None and streamablehttp_client is None
     console.print(
         "[yellow]Warning: MCP packages not installed. MCP tools will not be available.[/yellow]"
     )
+
+
+class SafeMCPClient(ToolProvider):
+    """Fail-soft wrapper around MCPClient.
+
+    Strands tool registration calls `await provider.load_tools()`. MCPClient may raise if it
+    cannot connect/start. We swallow that and return an empty tool list so a single broken MCP
+    server does not break the entire CLI session.
+    """
+
+    def __init__(self, inner: MCPClient, *, name: str):
+        self._inner = inner
+        self._name = name
+
+    @property
+    def prefix(self) -> str:
+        # keep the same prefix behavior as MCPClient for tool name resolution
+        return getattr(self._inner, "prefix", self._name)
+
+    async def load_tools(self, **kwargs: Any):  # type: ignore[override]
+        try:
+            return await self._inner.load_tools(**kwargs)
+        except Exception as e:  # noqa: BLE001
+            console.print(
+                f"[yellow]Warning: MCP server '{self._name}' failed to load tools, skipping. ({e})[/yellow]"
+            )
+            return []
+
+    def add_consumer(self, consumer_id: Any, **kwargs: Any) -> None:  # type: ignore[override]
+        # Delegate lifecycle management to the inner MCPClient if present.
+        try:
+            return self._inner.add_consumer(consumer_id, **kwargs)
+        except Exception:
+            # Fail-soft: if lifecycle cannot be tracked, we still allow tool loading attempts.
+            return None
+
+    def remove_consumer(self, consumer_id: Any, **kwargs: Any) -> None:  # type: ignore[override]
+        try:
+            return self._inner.remove_consumer(consumer_id, **kwargs)
+        except Exception:
+            return None
+
+    def __getattr__(self, item):
+        return getattr(self._inner, item)
 
 
 def load_mcp_config(agent_dir: Path) -> dict[str, Any] | None:
@@ -370,7 +426,7 @@ def get_mcp_server_info(assistant_id: str) -> list[dict[str, Any]]:
     return server_info_list
 
 
-def load_mcp_tools(assistant_id: str) -> list[MCPClient]:
+def load_mcp_tools(assistant_id: str, *, only_servers: set[str] | None = None) -> list[MCPClient]:
     """Load MCP tools from mcp.json configuration file.
 
     Args:
@@ -387,7 +443,9 @@ def load_mcp_tools(assistant_id: str) -> list[MCPClient]:
     if not mcp_servers:
         return []
 
-    mcp_clients = []
+    only_servers_norm = {s.strip() for s in only_servers} if only_servers else None
+
+    mcp_clients: list[MCPClient] = []
     for server_name, server_config in mcp_servers.items():
         # Check if server is disabled
         if server_config.get("disabled", False):
@@ -396,13 +454,15 @@ def load_mcp_tools(assistant_id: str) -> list[MCPClient]:
             )
             continue
 
+        if only_servers_norm is not None and server_name not in only_servers_norm:
+            continue
+
         client = create_mcp_client(server_name, server_config)
         if client:
-            # Use MCPClient directly - it implements ToolProvider interface
-            mcp_clients.append(client)
-            console.print(
-                f"[dim]Loaded MCP server: {server_name}[/dim]"
-            )
+            # Do NOT start here. Strands will call load_tools(), which starts/initializes internally.
+            # Wrap with SafeMCPClient so failures don't crash the session.
+            mcp_clients.append(SafeMCPClient(client, name=server_name))  # type: ignore[arg-type]
+            console.print(f"[dim]Loaded MCP server: {server_name}[/dim]")
 
     return mcp_clients
 

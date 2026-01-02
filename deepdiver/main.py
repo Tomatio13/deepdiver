@@ -16,9 +16,23 @@ from .execution import execute_task
 from .input import create_prompt_session
 from .mcp_tools import load_mcp_tools
 from .skills import execute_skills_command, setup_skills_parser
+from .subagents.commands import execute_subagents_command, setup_subagents_parser
+from .subagents.tools import delegate_to_subagent, delegate_to_subagents_parallel
 from .ui import show_help
 
-DEFAULT_TOOLS = [file_read, file_write, editor, shell, http_request, environment,calculator,current_time, filter_csv_data]
+DEFAULT_TOOLS = [
+    file_read,
+    file_write,
+    editor,
+    shell,
+    http_request,
+    environment,
+    calculator,
+    current_time,
+    filter_csv_data,
+    delegate_to_subagent,
+    delegate_to_subagents_parallel,
+]
 
 
 def check_cli_dependencies():
@@ -81,6 +95,9 @@ def parse_args():
 
     # Skills command
     setup_skills_parser(subparsers)
+
+    # Subagents command
+    setup_subagents_parser(subparsers)
 
     # Default interactive mode
     parser.add_argument(
@@ -229,6 +246,8 @@ def cli_main():
             reset_agent(args.agent, args.source_agent)
         elif args.command == "skills":
             execute_skills_command(args)
+        elif args.command == "subagents":
+            execute_subagents_command(args)
         else:
             # Create session state from args
             session_state = SessionState(auto_approve=args.auto_approve)
