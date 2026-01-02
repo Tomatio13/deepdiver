@@ -205,6 +205,212 @@ CLI には以下のデフォルトツールが組み込まれています:
 
 MCP (Model Context Protocol) サーバーが設定されている場合、追加のツールも利用可能です。
 
+## SubAgents
+
+Deepdiver は **SubAgents（サブエージェント）** の仕組みを使って、専門的なタスクを独立したエージェントに委譲できます。SubAgents は Markdown ファイル（YAML frontmatter 付き）として定義され、**progressive disclosure** 方式で管理されます。
+
+### ディレクトリ構成
+
+- ユーザー SubAgents: `~/.deepdiver/subagents/`
+- プロジェクト SubAgents: `.deepdiver/subagents/`（git ルート配下、同名があればこちらが優先）
+
+### SubAgent の作成
+
+```bash
+# ユーザー SubAgent を作成
+deepdiver subagents create my-subagent
+
+# プロジェクト SubAgent を作成
+deepdiver subagents create my-subagent --project
+```
+
+### SubAgent 定義ファイルの形式
+
+SubAgent は Markdown ファイルとして定義します:
+
+```md
+---
+name: code-reviewer
+description: コードレビューを専門に行うサブエージェント
+tools: file_read,editor
+enable_skills: true
+---
+
+# Code Reviewer
+
+## Purpose
+
+コードレビューを専門に行い、バグや改善点を指摘します。
+
+## When to Use
+
+- コードの品質チェックが必要な場合
+- セキュリティ問題の検出が必要な場合
+
+## Instructions
+
+1. コードを読み込み、構造を理解する
+2. バグ、セキュリティ問題、パフォーマンス問題を検出
+3. 改善提案を具体的に提示する
+```
+
+### SubAgent の管理コマンド
+
+```bash
+# SubAgent 一覧を表示
+deepdiver subagents list
+
+# プロジェクト SubAgent のみ表示
+deepdiver subagents list --project
+
+# SubAgent の詳細情報を表示
+deepdiver subagents info my-subagent
+
+# SubAgent を直接実行
+deepdiver subagents run my-subagent --agent agent -- "タスクの説明"
+
+# 以前の実行を再開
+deepdiver subagents resume <run_id> my-subagent --agent agent -- "続きのタスク"
+```
+
+### メインエージェントからの使用
+
+メインエージェントは、以下のツールを使って SubAgent にタスクを委譲できます:
+
+- `delegate_to_subagent(name=..., task=...)` - 単一の SubAgent にタスクを委譲
+- `delegate_to_subagents_parallel(requests=[...])` - 複数の SubAgent に並列でタスクを委譲
+
+SubAgent は独立したコンテキストで実行され、必要に応じてツールアクセスを制限できます。また、メインエージェントの Skills や MCP ツールも利用可能です（設定により制限可能）。
+
+### CLI 内での使用
+
+CLI 実行中に `/subagents` コマンドで SubAgent を直接実行することもできます:
+
+```
+/subagents my-subagent タスクの説明
+```
+
+## MCP (Model Context Protocol)
+
+Deepdiver は **MCP (Model Context Protocol)** をサポートしており、外部ツールやサービスをエージェントに統合できます。MCP サーバーはエージェントごとに設定され、stdio、SSE (Server-Sent Events)、Streamable HTTP の各トランスポートをサポートします。
+
+### 設定方法
+
+各エージェントのディレクトリに `mcp.json` ファイルを作成して MCP サーバーを設定します:
+
+**設定ファイルの場所**: `~/.deepdiver/<agent-name>/mcp.json`
+
+### mcp.json の形式
+
+```json
+{
+  "mcpServers": {
+    "taivily": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-taivily"],
+      "env": {
+        "TAIVILY_API_KEY": "your-api-key"
+      }
+    },
+    "weather": {
+      "url": "http://localhost:3000/sse",
+      "headers": {
+        "Authorization": "Bearer your-token"
+      }
+    },
+    "filesystem": {
+      "command": "uvx",
+      "args": ["mcp-server-filesystem", "/path/to/allowed/directory"],
+      "env": {}
+    }
+  }
+}
+```
+
+### トランスポートタイプ
+
+#### stdio（標準入出力）
+
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "command": "python",
+      "args": ["-m", "mcp_server_module"],
+      "env": {
+        "API_KEY": "value"
+      }
+    }
+  }
+}
+```
+
+#### SSE (Server-Sent Events)
+
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "url": "http://localhost:3000/sse"
+    }
+  }
+}
+```
+
+#### Streamable HTTP
+
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "Authorization": "Bearer token"
+      }
+    }
+  }
+}
+```
+
+### MCP サーバーの無効化
+
+特定の MCP サーバーを一時的に無効化するには、`disabled` フラグを設定します:
+
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "command": "...",
+      "disabled": true
+    }
+  }
+}
+```
+
+### CLI 内での確認
+
+CLI 実行中に `/mcp` コマンドで設定済みの MCP サーバー情報を確認できます:
+
+```
+/mcp
+```
+
+### SubAgent での MCP 利用
+
+SubAgent 定義の `tools` フィールドで MCP ツールを指定すると、その SubAgent は必要な MCP サーバーのみを読み込みます。これにより、不要な MCP サーバーの起動を避け、パフォーマンスを向上させることができます。
+
+例:
+
+```md
+---
+name: weather-checker
+description: 天気予報を取得するサブエージェント
+tools: weather_get_forecast,current_time
+---
+```
+
+この場合、`weather` プレフィックスを持つ MCP サーバーのみが読み込まれます。
+
 ## Skills
 
 Deepdiver は Agent Skills の仕組みを使って、専門的な手順やワークフローを追加できます。Skills は `SKILL.md` を含むフォルダとして管理され、必要なときにだけ読み込まれる **progressive disclosure** 方式です。
