@@ -180,6 +180,14 @@ def _load_model_config(raw_value: str | None, provider: str) -> dict[str, Any]:
             config["model"] = os.environ["ANTHROPIC_MODEL"]
         if os.environ.get("ANTHROPIC_API_KEY"):
             config["api_key"] = os.environ["ANTHROPIC_API_KEY"]
+    elif provider == "ollama":
+        host = os.environ.get("OLLAMA_HOST")
+        if host:
+            config["host"] = host
+
+        model_id = os.environ.get("OLLAMA_MODEL_ID") or os.environ.get("OLLAMA_MODEL")
+        if model_id:
+            config["model_id"] = model_id
     elif provider == "gemini":
         # Geminiプロバイダの設定
         # client_argsにapi_keyを設定

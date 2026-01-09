@@ -115,6 +115,7 @@ export STRANDS_MODEL_CONFIG='{"model_id": "anthropic.claude-3-5-sonnet-20241022-
 - Bedrock: `BEDROCK_MODEL_ID` もしくは `STRANDS_MODEL_ID`、`BEDROCK_REGION` もしくは `AWS_REGION`。これらが設定されていれば `STRANDS_MODEL_CONFIG` とマージされます。
 - OpenAI: `OPENAI_MODEL` または `OPENAI_MODEL_ID`（モデルID）、`OPENAI_API_KEY`（APIキー）、`OPENAI_BASE_URL`（OpenAI互換サーバーのベースURL、オプション）。LiteLLMなどのOpenAI互換プロバイダに接続する場合は `OPENAI_BASE_URL` を設定してください。
 - Anthropic: `ANTHROPIC_MODEL`, `ANTHROPIC_API_KEY`
+- Ollama: `OLLAMA_MODEL` または `OLLAMA_MODEL_ID`（モデルID）、`OLLAMA_HOST`（OllamaサーバーURL）
 - Gemini: `GEMINI_MODEL` または `GEMINI_MODEL_ID`（モデルID）、`GOOGLE_API_KEY` または `GEMINI_API_KEY`（APIキー）。Google AI StudioからAPIキーを取得できます。
 
 `.env` を利用する場合は `python-dotenv` により自動で読み込まれます。値に API キーなど機密情報を含めたくない場合はファイルパスを `STRANDS_MODEL_CONFIG` に渡し、JSON 内の該当キーだけを管理する運用も可能です。
@@ -163,6 +164,19 @@ GOOGLE_API_KEY=your-google-api-key
 
 # または、STRANDS_MODEL_CONFIGで設定することも可能
 # STRANDS_MODEL_CONFIG='{"client_args": {"api_key": "your-google-api-key"}, "model_id": "gemini-2.5-flash", "params": {"temperature": 0.7, "max_output_tokens": 2048}}'
+```
+
+#### Ollama 向け `.env` サンプル
+
+```env
+STRANDS_MODEL_PROVIDER=ollama
+
+# モデルIDとホスト
+OLLAMA_MODEL_ID=llama3.1
+OLLAMA_HOST=http://localhost:11434
+
+# または、STRANDS_MODEL_CONFIGで設定することも可能
+# STRANDS_MODEL_CONFIG='{"model_id": "llama3.1", "host": "http://localhost:11434"}'
 ```
 
 `STRANDS_MODEL_CONFIG` はファイルパス（例: `./model-config.json`）を指すように設定することもできます。Strands CLI 起動時に `python-dotenv` が `.env` を読み込むため、追加の読み込み処理は不要です。
