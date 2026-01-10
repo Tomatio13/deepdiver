@@ -70,6 +70,11 @@ def check_cli_dependencies():
         sys.exit(1)
 
 
+def _env_auto_approve() -> bool:
+    value = os.environ.get("DEEPDIVER_AUTO_APPROVE", "").strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
@@ -249,8 +254,10 @@ def cli_main():
         elif args.command == "subagents":
             execute_subagents_command(args)
         else:
-            # Create session state from args
-            session_state = SessionState(auto_approve=args.auto_approve)
+            # Create session state from args or env
+            session_state = SessionState(
+                auto_approve=args.auto_approve or _env_auto_approve()
+            )
 
             # API key validation happens in create_model()
             asyncio.run(main(args.agent, session_state))
