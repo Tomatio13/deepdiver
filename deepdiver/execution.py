@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import json
 import re
 import sys
@@ -24,6 +25,36 @@ from .skills.paths import get_project_skills_dir, get_user_skills_dir
 from .ui import render_todos_panel, toast
 
 _PRINTED_TOOL_PARAMS_IDS: set[str] = set()
+_PRINTED_TOOL_PARAMS_KEYS: set[str] = set()
+_LAST_TOOL_REQUEST: dict[str, float] = {}
+_LAST_TOOL_NAME_REQUEST: dict[str, tuple[float, str]] = {}
+_LAST_TOOL_APPROVAL: dict[str, float] = {}
+
+
+def _normalize_tool_input(tool_input: Any) -> str:
+    """Normalize tool input for stable dedupe keys."""
+    if tool_input is None:
+        return ""
+    if isinstance(tool_input, (dict, list)):
+        try:
+            return json.dumps(tool_input, sort_keys=True, default=str)
+        except Exception:
+            return str(tool_input)
+    if isinstance(tool_input, str):
+        s = tool_input.strip()
+        if not s:
+            return ""
+        if s.startswith("{") or s.startswith("["):
+            try:
+                loaded = json.loads(s)
+                return json.dumps(loaded, sort_keys=True, default=str)
+            except Exception:
+                return s
+        return s
+    return str(tool_input)
+
+
+# Debug helpers removed after investigation
 
 
 def looks_like_markdown(text: str) -> bool:
@@ -318,7 +349,7 @@ def _render_lifecycle_event(event: dict, debug_mode: bool = False) -> None:
         sys.stdout.flush()
 
 
-def _render_tool_stream_event(event: dict) -> None:
+def _render_tool_stream_event(event: dict, session_state=None) -> None:
     """Render tool streaming event.
     
     Args:
@@ -333,12 +364,18 @@ def _render_tool_stream_event(event: dict) -> None:
     data = tool_stream_event.get("data")
     
     if data:
+        # ステータス表示があると同じ行を上書きしやすいので一時停止する
+        restore_tool_status = None
+        if session_state and session_state.tool_status:
+            restore_tool_status = session_state.tool_status
+            session_state.clear_status()
         # ツールからのストリーミングデータを表示
         console.print(
             f"[dim]🔧 Tool '{tool_name}' streaming: {data}[/dim]",
-            end=""
         )
         sys.stdout.flush()
+        if restore_tool_status:
+            session_state.set_tool_status(restore_tool_status)
 
 def _ask_tool_approval_sync(tool_name: str, tool_data: dict) -> bool:
     """Ask user for approval before executing a tool (synchronous version).
@@ -426,6 +463,7 @@ def _handle_tool_use(
     tool_use: dict,
     session_state,
     approved_tool_use_ids: set[str],
+    approved_tool_use_keys: set[str],
 ) -> None:
     """Handle tool use event in callback handler.
     
@@ -438,6 +476,8 @@ def _handle_tool_use(
     tool_use_id = tool_use.get("toolUseId")
     tool_input = tool_use.get("input")
     # NOTE: tool_use is often delivered multiple times (streaming). We print params once per toolUseId.
+
+    # Debug helpers removed after investigation
     
     # ツール実行開始時: ステータス表示を開始
     if tool_name:
@@ -463,8 +503,16 @@ def _handle_tool_use(
                     args_json = json.dumps(normalized, ensure_ascii=False, default=str)
                 except Exception:
                     args_json = str(normalized)
+                console.print()
                 console.print(f"[dim]{args_json}[/dim]")
                 _PRINTED_TOOL_PARAMS_IDS.add(tool_use_id)
+        elif tool_input is not None and tool_use_id is None:
+            key_input = _normalize_tool_input(tool_input)
+            tool_key = f"{tool_name}:{key_input}"
+            if tool_key not in _PRINTED_TOOL_PARAMS_KEYS:
+                console.print()
+                console.print(f"[dim]{tool_key}[/dim]")
+                _PRINTED_TOOL_PARAMS_KEYS.add(tool_key)
     
     if tool_name and not session_state.auto_approve:
         # 同期的に確認を求める（コールバックハンドラーは同期的）
@@ -475,6 +523,12 @@ def _handle_tool_use(
             # 確認済みとして記録
             approved_tool_use_ids.add(tool_use_id)
             # ツール実行再開時にステータスを再開
+            session_state.set_tool_status(f"Tool executing: {tool_name}...")
+        elif approved and tool_use_id is None:
+            # toolUseIdが無い場合は、name + input で一意化して確認済み扱い
+            key_input = _normalize_tool_input(tool_input)
+            tool_key = f"{tool_name}:{key_input}"
+            approved_tool_use_keys.add(tool_key)
             session_state.set_tool_status(f"Tool executing: {tool_name}...")
         else:
             if not approved:
@@ -488,6 +542,10 @@ def _handle_tool_use(
         # auto_approveがONの場合は、確認済みとして記録
         if tool_use_id:
             approved_tool_use_ids.add(tool_use_id)
+        else:
+            key_input = _normalize_tool_input(tool_input)
+            tool_key = f"{tool_name}:{key_input}"
+            approved_tool_use_keys.add(tool_key)
 
 
 def _handle_tool_complete(session_state) -> None:
@@ -504,6 +562,9 @@ def _handle_tool_complete(session_state) -> None:
 def create_combined_callback(
     session_state,
     approved_tool_use_ids: set[str],
+    approved_tool_use_keys: set[str],
+    asked_tool_use_ids: set[str],
+    asked_tool_use_keys: set[str],
     original_callback: Callable | None,
 ) -> Callable:
     """Create a combined callback handler for agent tool execution.
@@ -522,20 +583,80 @@ def create_combined_callback(
         if "current_tool_use" in kwargs:
             tool_use = kwargs["current_tool_use"]
             tool_use_id = tool_use.get("toolUseId")
-            
+            tool_name = tool_use.get("name")
+            tool_input = tool_use.get("input")
+
+            # Debug helpers removed after investigation
+
             # 同じtoolUseIdで既に確認済みの場合はスキップ
             if tool_use_id and tool_use_id in approved_tool_use_ids:
                 # 既に確認済みなので、元のコールバックのみ呼び出す
                 if original_callback:
                     original_callback(**kwargs)
                 return
+            if tool_use_id and tool_use_id in asked_tool_use_ids:
+                if original_callback:
+                    original_callback(**kwargs)
+                return
+            if tool_name:
+                key_input = _normalize_tool_input(tool_input)
+                tool_key = f"{tool_name}:{key_input}"
+                last_approval_at = _LAST_TOOL_APPROVAL.get(tool_key)
+                now = time.monotonic()
+                # 直近の同一ツール確認は抑制（toolUseIdの有無に関わらず）
+                if last_approval_at is not None and now - last_approval_at < 2.0:
+                    if original_callback:
+                        original_callback(**kwargs)
+                    return
+
+            if not tool_use_id and tool_name:
+                key_input = _normalize_tool_input(tool_input)
+                tool_key = f"{tool_name}:{key_input}"
+                if tool_key in approved_tool_use_keys:
+                    if original_callback:
+                        original_callback(**kwargs)
+                    return
+                if tool_key in asked_tool_use_keys:
+                    if original_callback:
+                        original_callback(**kwargs)
+                    return
+                # 直近の同一ツール呼び出しは再確認しない（ストリーミングの重複イベント対策）
+                last_at = _LAST_TOOL_REQUEST.get(tool_key)
+                now = time.monotonic()
+                if last_at is not None and now - last_at < 2.0:
+                    if original_callback:
+                        original_callback(**kwargs)
+                    return
+                # toolUseIdが変わっても、同じツール名 + 同じ入力が短時間で来たら抑制
+                last_name = _LAST_TOOL_NAME_REQUEST.get(tool_name)
+                if last_name:
+                    last_time, last_input = last_name
+                    if last_input == key_input and now - last_time < 5.0:
+                        if original_callback:
+                            original_callback(**kwargs)
+                        return
             
             # ツール実行処理
+            if tool_name:
+                _LAST_TOOL_APPROVAL[tool_key] = time.monotonic()
+
+            if tool_use_id:
+                asked_tool_use_ids.add(tool_use_id)
+            elif tool_name:
+                asked_tool_use_keys.add(tool_key)
+
             _handle_tool_use(
                 tool_use,
                 session_state,
                 approved_tool_use_ids,
+                approved_tool_use_keys,
             )
+            if not tool_use_id and tool_name:
+                _LAST_TOOL_REQUEST[tool_key] = time.monotonic()
+                _LAST_TOOL_NAME_REQUEST[tool_name] = (
+                    time.monotonic(),
+                    _normalize_tool_input(tool_input),
+                )
         
         # AI思考中（ツール実行以外の処理中）の検出
         # イベントストリームで検出するため、ここではツール実行終了時の処理のみ
@@ -546,6 +667,9 @@ def create_combined_callback(
         if original_callback:
             original_callback(**kwargs)
     
+    # Mark wrapper to avoid double-wrapping across runs
+    combined_callback._deepdiver_wrapper = True  # type: ignore[attr-defined]
+    combined_callback._deepdiver_original = original_callback  # type: ignore[attr-defined]
     return combined_callback
 
 
@@ -570,15 +694,23 @@ async def _stream_agent(
     final_response = ""
     # 確認済みのツール実行IDを追跡（重複確認を防ぐ）
     approved_tool_use_ids: set[str] = set()
+    approved_tool_use_keys: set[str] = set()
+    asked_tool_use_ids: set[str] = set()
+    asked_tool_use_keys: set[str] = set()
     
     try:
         # コールバックハンドラーを設定（エージェントがサポートしている場合）
         original_callback = getattr(agent, "callback_handler", None)
+        if getattr(original_callback, "_deepdiver_wrapper", False):
+            original_callback = getattr(original_callback, "_deepdiver_original", None)
         if hasattr(agent, "callback_handler") and session_state:
             # 既存のコールバックハンドラーと統合
             combined_callback = create_combined_callback(
                 session_state,
                 approved_tool_use_ids,
+                approved_tool_use_keys,
+                asked_tool_use_ids,
+                asked_tool_use_keys,
                 original_callback,
             )
             agent.callback_handler = combined_callback
@@ -603,7 +735,7 @@ async def _stream_agent(
             #_render_tool_event(event)
             
             # ツールストリーミングイベントの表示
-            _render_tool_stream_event(event)
+            _render_tool_stream_event(event, session_state)
             
             # モデルデルタをレンダリング（リアルタイム表示）
             # テキストがストリーミングされている場合は、思考中のステータスを停止

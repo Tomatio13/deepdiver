@@ -494,7 +494,7 @@ def load_mcp_tools(assistant_id: str, *, only_servers: set[str] | None = None) -
             # Do NOT start here. Strands will call load_tools(), which starts/initializes internally.
             # Wrap with SafeMCPClient so failures don't crash the session.
             mcp_clients.append(SafeMCPClient(client, name=server_name))  # type: ignore[arg-type]
+            console.print()
             console.print(f"[dim]Loaded MCP server: {server_name}[/dim]")
 
     return mcp_clients
-
