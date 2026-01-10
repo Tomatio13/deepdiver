@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 import json
 import re
@@ -29,6 +30,17 @@ _PRINTED_TOOL_PARAMS_KEYS: set[str] = set()
 _LAST_TOOL_REQUEST: dict[str, float] = {}
 _LAST_TOOL_NAME_REQUEST: dict[str, tuple[float, str]] = {}
 _LAST_TOOL_APPROVAL: dict[str, float] = {}
+_SKILLS_DISCOVERY_CACHE: dict[str, str | None] = {}
+
+
+def _now_ms() -> int:
+    return int(time.perf_counter() * 1000)
+
+
+def _log_timing(label: str, start_ms: int) -> None:
+    if os.environ.get("DEEPDIVER_TIMING") == "1":
+        elapsed = _now_ms() - start_ms
+        console.print(f"[dim]timing: {label} {elapsed}ms[/dim]")
 
 
 def _normalize_tool_input(tool_input: Any) -> str:
@@ -214,11 +226,16 @@ def _extract_skill_prefix(user_input: str, assistant_id: str | None) -> tuple[st
 
 
 def _build_skills_discovery_prompt(assistant_id: str | None) -> str | None:
+    cache_key = assistant_id or "agent"
+    if cache_key in _SKILLS_DISCOVERY_CACHE:
+        return _SKILLS_DISCOVERY_CACHE[cache_key]
+
     skills = list_skills(
         user_skills_dir=get_user_skills_dir(assistant_id or "agent"),
         project_skills_dir=get_project_skills_dir(),
     )
     if not skills:
+        _SKILLS_DISCOVERY_CACHE[cache_key] = None
         return None
 
     lines = [
@@ -232,7 +249,9 @@ def _build_skills_discovery_prompt(assistant_id: str | None) -> str | None:
             f"- {skill['name']}: {skill['description']} (path: {skill['path']})"
         )
 
-    return "\n".join(lines)
+    prompt = "\n".join(lines)
+    _SKILLS_DISCOVERY_CACHE[cache_key] = prompt
+    return prompt
 
 
 def _stringify_response(response: Any) -> str:
@@ -690,6 +709,7 @@ async def _stream_agent(
     Returns:
         Final response text, or None if no response was generated
     """
+    start_ms = _now_ms()
     response_buffer: list[str] = []
     final_response = ""
     # 確認済みのツール実行IDを追跡（重複確認を防ぐ）
@@ -719,9 +739,13 @@ async def _stream_agent(
         if session_state:
             session_state.set_thinking_status("Thinking...")
         
+        stream_start_ms = _now_ms()
         async for event in agent.stream_async(prompt):
             if not isinstance(event, dict):
                 continue
+            if stream_start_ms:
+                _log_timing("stream_first_event", stream_start_ms)
+                stream_start_ms = 0
 
             # 強制停止イベントのチェック
             if event.get("force_stop", False):
@@ -760,6 +784,7 @@ async def _stream_agent(
         if session_state:
             session_state.clear_status()
         combined = final_response or "".join(response_buffer)
+        _log_timing("stream_total", start_ms)
         return combined.strip() or None
             
     except KeyboardInterrupt:
@@ -768,23 +793,30 @@ async def _stream_agent(
             session_state.clear_status()
         toast("Stream interrupted by user", kind="warning")
         combined = final_response or "".join(response_buffer)
+        _log_timing("stream_total", start_ms)
         return combined.strip() or None
     except Exception as exc:  # noqa: BLE001 - fall back to non-streaming
         # エラー時はステータス表示をクリアしてからメッセージを表示
         if session_state:
             session_state.clear_status()
         toast(f"Streaming unavailable, falling back to blocking call ({exc})", kind="warning")
-        return await _invoke_agent(agent, prompt)
+        result = await _invoke_agent(agent, prompt)
+        _log_timing("stream_fallback_total", start_ms)
+        return result
 
 
 async def _invoke_agent(agent: Any, prompt: str) -> str:
     # ステータス表示中はconsole.print()を呼び出さない
     if hasattr(agent, "invoke_async"):
+        start_ms = _now_ms()
         response = await agent.invoke_async(prompt)
+        _log_timing("invoke_async_total", start_ms)
         return _stringify_response(response)
 
     loop = asyncio.get_running_loop()
+    start_ms = _now_ms()
     response = await loop.run_in_executor(None, lambda: agent(prompt))
+    _log_timing("invoke_sync_total", start_ms)
     return _stringify_response(response)
 
 async def execute_task(
@@ -794,24 +826,33 @@ async def execute_task(
     session_state,
 ):
     """Execute a task by delegating to the Strands agent."""
+    task_start_ms = _now_ms()
 
+    t0 = _now_ms()
     skill_prompt, cleaned_input = _extract_skill_prefix(user_input, assistant_id)
+    _log_timing("extract_skill_prefix", t0)
+    t0 = _now_ms()
     final_input = _assemble_prompt(cleaned_input)
+    _log_timing("assemble_prompt", t0)
 
     if skill_prompt:
         final_input = f"{skill_prompt}\n\n{final_input}" if final_input else skill_prompt
     else:
+        t0 = _now_ms()
         discovery_prompt = _build_skills_discovery_prompt(assistant_id)
+        _log_timing("build_skills_discovery_prompt", t0)
         if discovery_prompt:
             final_input = (
                 f"{discovery_prompt}\n\n{final_input}" if final_input else discovery_prompt
             )
+
     
     # 参考コードのパターンに従い、with文でstatusを管理
     # メッセージの最後に\nを追加して、ステータス終了後に改行が入るようにする
 
     if hasattr(agent, "stream_async"):
         response_text = await _stream_agent(agent, final_input, session_state)
+        _log_timing("execute_task_total", task_start_ms)
         # ストリーミング中に既に内容が表示されているため、改行のみ追加
         console.print()
         
@@ -824,6 +865,7 @@ async def execute_task(
                 console.print()
     else:
         response_text = await _invoke_agent(agent, final_input)
+        _log_timing("execute_task_total", task_start_ms)
         # response_textがNoneの場合は空文字列にフォールバック
         if response_text is None:
             response_text = ""

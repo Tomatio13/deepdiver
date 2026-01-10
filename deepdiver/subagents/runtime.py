@@ -93,12 +93,10 @@ def _base_cli_prompt(assistant_id: str) -> str:
     cwd = Path.cwd()
     working_dir = f"{cwd.name}/workspace"
     agent_dir = AGENT_ROOT / assistant_id
-    memory_dir = agent_dir / "memories"
     return f"""### CLI Runtime Context
 
 - Working directory: `{working_dir}`
 - Agent profile directory: `{agent_dir}`
-- Persistent memory directory: `{memory_dir}`
 - If working directory is not `{working_dir}`, create it and use it.
 - If working directory is `{working_dir}`, use it.
 """
@@ -427,4 +425,3 @@ def warn_if_tools_filtered(subagent: SubagentMetadata, tools_before: list[Any], 
         console.print(
             f"[dim]Subagent '{subagent['name']}' tools restricted: {len(tools_after)}/{len(tools_before)} allowed[/dim]"
         )
-
