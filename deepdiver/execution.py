@@ -717,7 +717,7 @@ async def _stream_agent(
         
         # ストリーミング開始時: AI思考中のステータスを開始
         if session_state:
-            session_state.set_thinking_status("AI Thinking...")
+            session_state.set_thinking_status("Thinking...")
         
         async for event in agent.stream_async(prompt):
             if not isinstance(event, dict):

@@ -19,7 +19,8 @@ COLORS = {
     "dim": "#6b7280",
     "user": "#ffffff",
     "agent": "#ffffff",
-    "thinking": "#34d399",
+    #"thinking": "#34d399",
+    "thinking": "#00bfff",
     "tool": "#fbbf24",
     "success": "#34d399",  # 緑系 - 成功メッセージ用
     "warning": "#fbbf24",  # 黄色系 - 警告メッセージ用
@@ -105,13 +106,13 @@ class SessionState:
         if self.tool_status:
             self._status_obj = console.status(
                 f"[{COLORS['tool']}]🔧 {self.tool_status}[/]",
-                spinner="aesthetic"
+                spinner="dots"
             )
             self._status_obj.start()
         elif self.thinking_status:
             self._status_obj = console.status(
-                f"[{COLORS['thinking']}]📡 {self.thinking_status}[/]",
-                spinner="aesthetic"
+                f"[{COLORS['thinking']}] {self.thinking_status}[/]",
+                spinner="dots"
             )
             self._status_obj.start()
     
