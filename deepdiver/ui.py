@@ -220,7 +220,7 @@ def show_help() -> None:
     """Show help information."""
 
     console.print()
-    console.print(DEEPDIVER_ASCII, style=f"bold {COLORS['primary']}")
+    console.print(DEEPDIVER_ASCII, style=f"{COLORS['primary']}")
     console.print()
 
     console.print("[bold]Usage:[/bold]", style=COLORS["primary"])
