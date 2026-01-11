@@ -8,6 +8,7 @@ import time
 import json
 import re
 import sys
+import uuid
 from pathlib import Path
 from collections.abc import Callable
 from typing import Any, Iterable
@@ -19,11 +20,12 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
 
-from .config import COLORS, console
+from .config import COLORS, SENSITIVE_KEYS, console
 from .input import parse_file_mentions
 from .skills.load import list_skills
 from .skills.paths import get_project_skills_dir, get_user_skills_dir
 from .ui import render_todos_panel, toast
+from .transcripts import CodexRolloutLogger, transcripts_enabled
 
 _PRINTED_TOOL_PARAMS_IDS: set[str] = set()
 _PRINTED_TOOL_PARAMS_KEYS: set[str] = set()
@@ -64,6 +66,36 @@ def _normalize_tool_input(tool_input: Any) -> str:
                 return s
         return s
     return str(tool_input)
+
+
+def _redact_sensitive(value: Any) -> Any:
+    if isinstance(value, dict):
+        out: dict[str, Any] = {}
+        for k, v in value.items():
+            if isinstance(k, str) and k.lower() in SENSITIVE_KEYS:
+                out[k] = "***"
+            else:
+                out[k] = _redact_sensitive(v)
+        return out
+    if isinstance(value, list):
+        return [_redact_sensitive(v) for v in value]
+    return value
+
+
+_STANDARD_TOOL_NAMES = {
+    "shell",
+    "shell_command",
+    "file_read",
+    "file_write",
+    "editor",
+    "http_request",
+    "environment",
+    "calculator",
+    "current_time",
+    "filter_csv_data",
+    "delegate_to_subagent",
+    "delegate_to_subagents_parallel",
+}
 
 
 # Debug helpers removed after investigation
@@ -267,6 +299,10 @@ def _stringify_response(response: Any) -> str:
     if isinstance(response, str):
         return response
     if isinstance(response, dict):
+        try:
+            return json.dumps(response, ensure_ascii=False, default=str, separators=(",", ":"))
+        except Exception:
+            pass
         for key in ("output_text", "content", "text", "message"):
             value = response.get(key)
             if isinstance(value, str) and value.strip():
@@ -329,6 +365,21 @@ def _render_model_delta(event: dict, buffer: list[str], session_state=None) -> b
         return True
     
     return False
+
+
+def _extract_tool_results_from_message(message: Any) -> list[dict[str, Any]]:
+    if not isinstance(message, dict):
+        return []
+    content = message.get("content")
+    if not isinstance(content, list):
+        return []
+    results: list[dict[str, Any]] = []
+    for block in content:
+        if isinstance(block, dict) and "toolResult" in block:
+            tool_result = block.get("toolResult")
+            if isinstance(tool_result, dict):
+                results.append(tool_result)
+    return results
 
 
 def _extract_final_response(event: dict) -> str:
@@ -604,6 +655,7 @@ def create_combined_callback(
     asked_tool_use_ids: set[str],
     asked_tool_use_keys: set[str],
     original_callback: Callable | None,
+    tool_event_logger: Callable[[str, dict[str, Any]], None] | None,
 ) -> Callable:
     """Create a combined callback handler for agent tool execution.
     
@@ -695,10 +747,57 @@ def create_combined_callback(
                     time.monotonic(),
                     _normalize_tool_input(tool_input),
                 )
+
+            if tool_event_logger and tool_name:
+                tool_event_logger(
+                    "tool_use",
+                    {
+                        "name": tool_name,
+                        "tool_use_id": tool_use_id,
+                        "input": _redact_sensitive(tool_input),
+                    },
+                )
         
         # AI思考中（ツール実行以外の処理中）の検出
         # イベントストリームで検出するため、ここではツール実行終了時の処理のみ
         if "tool_result" in kwargs or "tool_complete" in kwargs:
+            if tool_event_logger:
+                if "tool_result" in kwargs:
+                    result_payload = kwargs.get("tool_result")
+                    tool_event_logger(
+                        "tool_result",
+                        {
+                            "data": _redact_sensitive(result_payload),
+                            "tool_use_id": (
+                                result_payload.get("toolUseId")
+                                if isinstance(result_payload, dict)
+                                else None
+                            ),
+                            "name": (
+                                result_payload.get("name")
+                                if isinstance(result_payload, dict)
+                                else None
+                            ),
+                        },
+                    )
+                if "tool_complete" in kwargs:
+                    complete_payload = kwargs.get("tool_complete")
+                    tool_event_logger(
+                        "tool_complete",
+                        {
+                            "data": _redact_sensitive(complete_payload),
+                            "tool_use_id": (
+                                complete_payload.get("toolUseId")
+                                if isinstance(complete_payload, dict)
+                                else None
+                            ),
+                            "name": (
+                                complete_payload.get("name")
+                                if isinstance(complete_payload, dict)
+                                else None
+                            ),
+                        },
+                    )
             _handle_tool_complete(session_state)
         
         # 元のコールバックハンドラーを呼び出す
@@ -712,7 +811,11 @@ def create_combined_callback(
 
 
 async def _stream_agent(
-    agent: Any, prompt: str, session_state=None, debug_mode: bool = False
+    agent: Any,
+    prompt: str,
+    session_state=None,
+    debug_mode: bool = False,
+    tool_event_logger: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> str | None:
     """Stream agent response and render events in real-time.
     
@@ -751,6 +854,7 @@ async def _stream_agent(
                 asked_tool_use_ids,
                 asked_tool_use_keys,
                 original_callback,
+                tool_event_logger,
             )
             agent.callback_handler = combined_callback
         
@@ -784,6 +888,55 @@ async def _stream_agent(
             # テキストがストリーミングされている場合は、思考中のステータスを停止
             # 注意: _render_model_delta内で既にステータスを停止している
             _render_model_delta(event, response_buffer, session_state)
+
+            if tool_event_logger:
+                message = event.get("message")
+                tool_results = _extract_tool_results_from_message(message)
+                for tool_result in tool_results:
+                    tool_event_logger(
+                        "tool_result_message",
+                        {
+                            "data": _redact_sensitive(tool_result),
+                            "tool_use_id": tool_result.get("toolUseId"),
+                            "name": tool_result.get("name"),
+                        },
+                    )
+                if "tool_result" in event:
+                    result_payload = event.get("tool_result")
+                    tool_event_logger(
+                        "tool_result",
+                        {
+                            "data": _redact_sensitive(result_payload),
+                            "tool_use_id": (
+                                result_payload.get("toolUseId")
+                                if isinstance(result_payload, dict)
+                                else None
+                            ),
+                            "name": (
+                                result_payload.get("name")
+                                if isinstance(result_payload, dict)
+                                else None
+                            ),
+                        },
+                    )
+                if "tool_complete" in event:
+                    complete_payload = event.get("tool_complete")
+                    tool_event_logger(
+                        "tool_complete",
+                        {
+                            "data": _redact_sensitive(complete_payload),
+                            "tool_use_id": (
+                                complete_payload.get("toolUseId")
+                                if isinstance(complete_payload, dict)
+                                else None
+                            ),
+                            "name": (
+                                complete_payload.get("name")
+                                if isinstance(complete_payload, dict)
+                                else None
+                            ),
+                        },
+                    )
 
             # 最終結果の取得
             # 注意: resultイベントは複数回発生する可能性があるため、
@@ -865,39 +1018,170 @@ async def execute_task(
                 f"{discovery_prompt}\n\n{final_input}" if final_input else discovery_prompt
             )
 
-    
+    codex_logger: CodexRolloutLogger | None = getattr(session_state, "codex_logger", None)
+    if codex_logger and transcripts_enabled():
+        approval_policy = "auto-approve" if session_state.auto_approve else "on-request"
+        codex_logger.log_turn_context(
+            cwd=str(Path.cwd()),
+            approval_policy=approval_policy,
+        )
+        codex_logger.log_message(role="user", text=user_input or "")
+
+    def tool_event_logger(event: str, data: dict[str, Any]) -> None:
+        if not codex_logger or not transcripts_enabled():
+            return
+        name = data.get("name")
+        tool_use_id = data.get("tool_use_id")
+        if event == "tool_use" and name:
+            call_id = codex_logger.resolve_call_id(name=name, tool_use_id=tool_use_id) or tool_use_id
+            if not call_id:
+                call_id = f"call_{uuid.uuid4().hex}"
+            is_custom = name not in _STANDARD_TOOL_NAMES
+            codex_logger.start_tool(name=name, call_id=call_id, is_custom=is_custom)
+            if is_custom:
+                input_data = data.get("input")
+                if input_data in (None, ""):
+                    input_data = {}
+                elif not isinstance(input_data, dict):
+                    input_data = {"input": input_data}
+                codex_logger.log_custom_tool_call(name=name, input_data=input_data, call_id=call_id)
+            else:
+                raw_input = data.get("input")
+                if raw_input in (None, ""):
+                    arguments = "{}"
+                else:
+                    try:
+                        arguments = json.dumps(
+                            raw_input,
+                            ensure_ascii=False,
+                            default=str,
+                            separators=(",", ":"),
+                        )
+                    except Exception:
+                        arguments = str(raw_input)
+                codex_logger.log_function_call(name=name, arguments=arguments, call_id=call_id)
+            return
+
+        if event in {"tool_result", "tool_complete", "tool_result_message"}:
+            result_data = data.get("data")
+            tool_use_id = data.get("tool_use_id")
+            name = data.get("name") or name
+            if isinstance(result_data, dict):
+                tool_use_id = tool_use_id or result_data.get("toolUseId") or result_data.get("tool_use_id")
+                name = name or result_data.get("name")
+            call_id = None
+            if name:
+                call_id = codex_logger.resolve_call_id(name=name, tool_use_id=tool_use_id)
+            if not call_id and tool_use_id:
+                call_id = tool_use_id
+            if not call_id:
+                call_id = codex_logger.last_started_call_id()
+            if not call_id:
+                return
+            output_text = _stringify_response(result_data)
+            codex_logger.finish_tool(call_id=call_id, output=output_text)
+
     # 参考コードのパターンに従い、with文でstatusを管理
     # メッセージの最後に\nを追加して、ステータス終了後に改行が入るようにする
 
-    if hasattr(agent, "stream_async"):
-        response_text = await _stream_agent(agent, final_input, session_state)
-        _log_timing("execute_task_total", task_start_ms)
-        # ストリーミング中に既に内容が表示されているため、改行のみ追加
-        console.print()
-        
-        # ストリーミング完了後、ToDoリストを抽出して表示
-        if response_text:
-            todos = extract_todos_from_text(response_text)
-            if todos:
-                console.print()
-                console.print(render_todos_panel(todos, max_completed=3))
-                console.print()
-    else:
-        response_text = await _invoke_agent(agent, final_input)
-        _log_timing("execute_task_total", task_start_ms)
-        # response_textがNoneの場合は空文字列にフォールバック
-        if response_text is None:
-            response_text = ""
-        
-        # Markdown/ANSI自動判別を使用して出力をレンダリング
-        if response_text:
+    try:
+        if hasattr(agent, "stream_async"):
+            response_text = await _stream_agent(
+                agent,
+                final_input,
+                session_state,
+                tool_event_logger=tool_event_logger if codex_logger and transcripts_enabled() else None,
+            )
+            _log_timing("execute_task_total", task_start_ms)
+            # ストリーミング中に既に内容が表示されているため、改行のみ追加
             console.print()
-            console.print(render_agent_output(response_text, title="Agent"))
             
-            # ToDoリストを抽出して表示
-            todos = extract_todos_from_text(response_text)
-            if todos:
+            # ストリーミング完了後、ToDoリストを抽出して表示
+            if response_text:
+                todos = extract_todos_from_text(response_text)
+                if todos:
+                    console.print()
+                    console.print(render_todos_panel(todos, max_completed=3))
+                    console.print()
+        else:
+            original_callback = getattr(agent, "callback_handler", None)
+            if codex_logger and transcripts_enabled():
+                def log_only_callback(**kwargs):  # type: ignore[no-redef]
+                    if "current_tool_use" in kwargs:
+                        tool_use = kwargs["current_tool_use"]
+                        tool_event_logger(
+                            "tool_use",
+                            {
+                                "name": tool_use.get("name"),
+                                "tool_use_id": tool_use.get("toolUseId"),
+                                "input": _redact_sensitive(tool_use.get("input")),
+                            },
+                        )
+                    if "tool_result" in kwargs:
+                        result_payload = kwargs.get("tool_result")
+                        tool_event_logger(
+                            "tool_result",
+                            {
+                                "data": _redact_sensitive(result_payload),
+                                "tool_use_id": (
+                                    result_payload.get("toolUseId")
+                                    if isinstance(result_payload, dict)
+                                    else None
+                                ),
+                                "name": (
+                                    result_payload.get("name")
+                                    if isinstance(result_payload, dict)
+                                    else None
+                                ),
+                            },
+                        )
+                    if "tool_complete" in kwargs:
+                        complete_payload = kwargs.get("tool_complete")
+                        tool_event_logger(
+                            "tool_complete",
+                            {
+                                "data": _redact_sensitive(complete_payload),
+                                "tool_use_id": (
+                                    complete_payload.get("toolUseId")
+                                    if isinstance(complete_payload, dict)
+                                    else None
+                                ),
+                                "name": (
+                                    complete_payload.get("name")
+                                    if isinstance(complete_payload, dict)
+                                    else None
+                                ),
+                            },
+                        )
+                    if original_callback:
+                        original_callback(**kwargs)
+
+                agent.callback_handler = log_only_callback
+
+            response_text = await _invoke_agent(agent, final_input)
+            if codex_logger and transcripts_enabled():
+                agent.callback_handler = original_callback
+            _log_timing("execute_task_total", task_start_ms)
+            # response_textがNoneの場合は空文字列にフォールバック
+            if response_text is None:
+                response_text = ""
+            
+            # Markdown/ANSI自動判別を使用して出力をレンダリング
+            if response_text:
                 console.print()
-                console.print(render_todos_panel(todos, max_completed=3))
-            
-            console.print()
+                console.print(render_agent_output(response_text, title="Agent"))
+                
+                # ToDoリストを抽出して表示
+                todos = extract_todos_from_text(response_text)
+                if todos:
+                    console.print()
+                    console.print(render_todos_panel(todos, max_completed=3))
+                
+                console.print()
+
+        if codex_logger and transcripts_enabled():
+            codex_logger.log_message(role="assistant", text=response_text or "")
+    except Exception as exc:  # noqa: BLE001
+        if codex_logger and transcripts_enabled():
+            codex_logger.log_message(role="assistant", text=str(exc))
+        raise
