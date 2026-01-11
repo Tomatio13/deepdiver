@@ -11,7 +11,6 @@ from .config import COLORS, COMMANDS, DEEPDIVER_ASCII, console
 
 # ToDo表示用のアイコンとスタイル
 TODO_ICON = {"pending": "○", "in_progress": "◔", "done": "✓", "completed": "✓"}
-TODO_STYLE = {"pending": "dim", "in_progress": "yellow", "done": "green", "completed": "green"}
 
 
 def normalize_todos(todos: list[dict]) -> list[dict]:
@@ -97,6 +96,13 @@ def render_todos_panel(todos: list[dict] | None = None, max_completed: int = 5) 
     if hidden_count > 0:
         table.add_row("", Text(f"... {hidden_count} completed tasks hidden ...", style="dim italic"))
     
+    todo_style = {
+        "pending": COLORS["dim"],
+        "in_progress": COLORS["warning"],
+        "done": COLORS["success"],
+        "completed": COLORS["success"],
+    }
+
     for idx, item in enumerate(todos, 1):
         if (idx - 1) not in show_indices:
             continue
@@ -107,18 +113,25 @@ def render_todos_panel(todos: list[dict] | None = None, max_completed: int = 5) 
             status = "completed"
         
         content = item.get("content", item.get("activeForm", "(empty)"))
-        text = Text(content, style=TODO_STYLE.get(status, "dim"))
+        text = Text(content, style=todo_style.get(status, COLORS["dim"]))
         
         # Strike through completed items
         if status == "completed":
             text.stylize("strike")
         
         icon = TODO_ICON.get(status, "○")
-        icon_text = Text(icon + " ", style=TODO_STYLE.get(status, "dim"))
+        icon_text = Text(icon + " ", style=todo_style.get(status, COLORS["dim"]))
         
         table.add_row(f"{idx}.", Text.assemble(icon_text, text))
     
-    return Panel(table, title="TODOs", border_style="blue", box=box.ROUNDED, padding=(1, 1))
+    title = f"[{COLORS['panel_title']}]TODOs[/]"
+    return Panel(
+        table,
+        title=title,
+        border_style=COLORS["panel_border"],
+        box=box.ROUNDED,
+        padding=(1, 1),
+    )
 
 
 def diff_todos(before: list[dict], after: list[dict]) -> list[str]:
@@ -166,11 +179,11 @@ def toast(message: str, kind: str = "info") -> None:
         kind: Type of notification - "success", "warning", "error", or "info" (default)
     """
     color = {
-        "success": "green",
-        "warning": "yellow",
-        "error": "red",
-    }.get(kind, "cyan")
-    console.print(Panel.fit(Text(message, style=color), border_style=color))
+        "success": COLORS["success"],
+        "warning": COLORS["warning"],
+        "error": COLORS["error"],
+    }.get(kind, COLORS["info"])
+    console.print(Panel.fit(Text(message, style=color), border_style=COLORS["panel_border"]))
 
 
 def show_interactive_help() -> None:

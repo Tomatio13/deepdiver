@@ -4,7 +4,16 @@ import subprocess
 from pathlib import Path
 
 from .agent import AGENT_ROOT
-from .config import COLORS, DEEPDIVER_ASCII, console, get_current_model_info
+from .config import (
+    COLORS,
+    DEEPDIVER_ASCII,
+    apply_theme,
+    console,
+    get_current_model_info,
+    get_theme_name,
+    get_theme_names,
+)
+from .input import apply_theme_to_prompt_session
 from .mcp_tools import get_mcp_server_info
 from .subagents.load import get_subagent, list_subagents
 from .subagents.paths import get_project_subagents_dir, get_user_subagents_dir
@@ -56,7 +65,9 @@ def _print_skill_detail(skill: dict) -> None:
     console.print()
 
 
-async def handle_command(command: str, assistant_id: str = "agent") -> str | bool:
+async def handle_command(
+    command: str, assistant_id: str = "agent", session_state=None
+) -> str | bool:
     """Handle slash commands. Returns 'exit' to exit, True if handled, False to pass to agent."""
     stripped_command = command.strip().lstrip("/")
     cmd_lower = stripped_command.lower()
@@ -94,6 +105,49 @@ async def handle_command(command: str, assistant_id: str = "agent") -> str | boo
             toast("No model provider configured.\nSet STRANDS_MODEL_PROVIDER environment variable to configure a model.", kind="warning")
         console.print()
         return True
+
+    if cmd_lower.startswith("theme"):
+        parts = stripped_command.split(maxsplit=1)
+        arg = parts[1].strip().lower() if len(parts) > 1 else ""
+
+        console.print()
+        theme_names = get_theme_names()
+        current = get_theme_name()
+
+        if not arg or arg in {"list", "ls"}:
+            console.print("[bold]Available Themes:[/bold]", style=COLORS["primary"])
+            for name in theme_names:
+                marker = "*" if name == current else " "
+                console.print(f"  {marker} {name}", style=COLORS["agent"])
+            console.print()
+            console.print(
+                f"[dim]Current theme: {current} (use /theme <name> to switch)[/dim]",
+                style=COLORS["dim"],
+            )
+            console.print()
+            return True
+
+        updated = False
+        if session_state:
+            updated = session_state.set_theme(arg)
+        else:
+            updated = apply_theme(arg)
+
+        if updated:
+            if session_state:
+                apply_theme_to_prompt_session(session_state)
+            console.print(
+                f"[bold]Theme updated:[/bold] {get_theme_name()}",
+                style=COLORS["primary"],
+            )
+        else:
+            toast(
+                f"Unknown theme: {arg}\nAvailable: {', '.join(theme_names)}",
+                kind="warning",
+            )
+        console.print()
+        return True
+
 
     if cmd_lower == "mcp":
         # Show MCP server information

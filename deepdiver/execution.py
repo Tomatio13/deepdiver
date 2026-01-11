@@ -145,7 +145,14 @@ def render_agent_output(raw: str, title: str = "Agent") -> Panel:
     else:
         body = Text.from_ansi(raw) if "\x1b[" in raw else Text(raw)
         body.overflow = "fold"
-    return Panel(body, title=title, border_style="cyan", box=box.ROUNDED, padding=(1, 2))
+    title_text = f"[{COLORS['panel_title']}]{title}[/]"
+    return Panel(
+        body,
+        title=title_text,
+        border_style=COLORS["panel_border"],
+        box=box.ROUNDED,
+        padding=(1, 2),
+    )
 
 
 def _assemble_prompt(user_input: str) -> str:
@@ -280,12 +287,14 @@ def _render_tool_event(event: dict) -> None:
         tool_name = event["current_tool_use"]["name"]
         data=_stringify_response(event["current_tool_use"])
         console.print()
-        console.print(f"🔧 Using tool: {tool_name}")
+        console.print(f"[{COLORS['tool']}]🔧 Using tool: {tool_name}[/]")
         console.print(
             Panel(
                 _stringify_response(data),
-                title="Tool Update",
-                border_style=COLORS["tool"],
+                title=f"[{COLORS['tool']}]Tool Update[/]",
+                border_style=COLORS["panel_border"],
+                box=box.ROUNDED,
+                padding=(1, 2),
             )
         )
     # ツールイベント表示後も即座にフラッシュして、表示を遅延させない
@@ -422,8 +431,18 @@ def _ask_tool_approval_sync(tool_name: str, tool_data: dict) -> bool:
     
     with cm:
         console.print()
-        body = Text(f"Tool execution requested: {tool_name}", style="bold yellow")
-        console.print(Panel(body, border_style="yellow", box=box.ROUNDED, padding=(1, 2)))
+        body = Text(
+            f"Tool execution requested: {tool_name}",
+            style=f"bold {COLORS['warning']}",
+        )
+        console.print(
+            Panel(
+                body,
+                border_style=COLORS["panel_border"],
+                box=box.ROUNDED,
+                padding=(1, 2),
+            )
+        )
         
         try:
             return Confirm.ask("Execute this tool?", default=False)
@@ -442,7 +461,7 @@ async def _ask_tool_approval_async(tool_name: str, tool_data: dict) -> bool:
         True if approved, False if rejected
     """
     console.print()
-    console.print(f"[yellow]🔧 Tool execution requested: {tool_name}[/yellow]")
+    console.print(f"[{COLORS['warning']}]🔧 Tool execution requested: {tool_name}[/]")
     # console.print(
     #     Panel(
     #         _stringify_response(tool_data),
