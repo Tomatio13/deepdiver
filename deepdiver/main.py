@@ -13,6 +13,7 @@ from .commands import execute_bash_command, handle_command
 from .config import COLORS, DEEPDIVER_ASCII, SessionState, console, create_model
 from .csv_tool import filter_csv_data
 from .execution import execute_task
+from .transcripts import CodexRolloutLogger, transcripts_enabled
 from .input import create_prompt_session
 from .mcp_tools import load_mcp_tools
 from .skills import execute_skills_command, setup_skills_parser
@@ -129,6 +130,9 @@ async def simple_cli(agent, assistant_id: str | None, session_state):
     console.print(f"  [dim]Working directory: {Path.cwd()}[/dim]")
     console.print(f"  [dim]Theme: {session_state.theme}[/dim]")
     console.print()
+
+    if transcripts_enabled():
+        session_state.codex_logger = CodexRolloutLogger()
 
     # Create prompt session
     session = create_prompt_session(assistant_id, session_state)
