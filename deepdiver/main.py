@@ -122,7 +122,7 @@ def parse_args():
 async def simple_cli(agent, assistant_id: str | None, session_state):
     """Main CLI loop."""
     console.clear()
-    console.print(DEEPDIVER_ASCII, style=f"bold {COLORS['primary']}")
+    console.print(DEEPDIVER_ASCII, style=f"{COLORS['primary']}")
     console.print()
 
     console.print("... Ready to Innovation! What would you like to create?", style=COLORS["agent"])

@@ -15,11 +15,11 @@ dotenv.load_dotenv()
 
 THEMES = {
     "dark": {
-        "primary": "#38bdf8",
-        "dim": "#64748b",
-        "user": "#e2e8f0",
+        "primary": "#00bfff",
+        "dim": "#6b7280",
+        "user": "#ffffff",
         "agent": "#e2e8f0",
-        "thinking": "#38bdf8",
+        "thinking": "#00bfff",
         "tool": "#fbbf24",
         "success": "#22c55e",
         "warning": "#f59e0b",

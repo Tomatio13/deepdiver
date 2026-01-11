@@ -78,7 +78,7 @@ async def handle_command(
     if cmd_lower == "clear":
         # Clear screen and show fresh UI
         console.clear()
-        console.print(DEEPDIVER_ASCII, style=f"bold {COLORS['primary']}")
+        console.print(DEEPDIVER_ASCII, style=f"{COLORS['primary']}")
         console.print()
         console.print(
             "... Fresh start! Screen cleared. Conversation state will continue in the current session.",
