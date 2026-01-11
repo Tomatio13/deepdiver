@@ -127,7 +127,11 @@ async def simple_cli(agent, assistant_id: str | None, session_state):
 
     console.print("... Ready to Innovation! What would you like to create?", style=COLORS["agent"])
     console.print(f"  [dim]Working directory: {Path.cwd()}[/dim]")
+    console.print(f"  [dim]Theme: {session_state.theme}[/dim]")
     console.print()
+
+    # Create prompt session
+    session = create_prompt_session(assistant_id, session_state)
 
     if session_state.auto_approve:
         console.print(
@@ -140,9 +144,6 @@ async def simple_cli(agent, assistant_id: str | None, session_state):
         style=f"dim {COLORS['dim']}",
     )
     console.print()
-
-    # Create prompt session
-    session = create_prompt_session(assistant_id, session_state)
 
     while True:
         try:
@@ -161,7 +162,7 @@ async def simple_cli(agent, assistant_id: str | None, session_state):
 
         # Check for slash commands first
         if user_input.startswith("/"):
-            result = await handle_command(user_input, assistant_id)
+            result = await handle_command(user_input, assistant_id, session_state)
             if result == "exit":
                 console.print("\nGoodbye!", style=COLORS["primary"])
                 # Return to allow cleanup

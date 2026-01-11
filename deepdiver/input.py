@@ -207,7 +207,7 @@ def get_bottom_toolbar(
             if session:
                 current_text = session.default_buffer.text
                 if current_text.startswith("!"):
-                    parts.append(("bg:#ff1493 fg:#ffffff bold", " BASH MODE "))
+                    parts.append(("class:toolbar-bash", " BASH MODE "))
                     parts.append(("", " | "))
         except (AttributeError, TypeError):
             # Silently ignore - toolbar is non-critical and called frequently
@@ -222,10 +222,41 @@ def get_bottom_toolbar(
             base_class = "class:toolbar-orange"
 
         parts.append((base_class, base_msg))
+        parts.append(("class:toolbar-dim", f"  theme:{session_state.theme}"))
 
         return parts
 
     return toolbar
+
+
+def _build_toolbar_style() -> "Style":
+    from prompt_toolkit.styles import Style
+
+    return Style.from_dict(
+        {
+            "bottom-toolbar": "noreverse",
+            "toolbar-green": f"bg:{COLORS['toolbar_ok_bg']} {COLORS['toolbar_ok_fg']}",
+            "toolbar-orange": f"bg:{COLORS['toolbar_warn_bg']} {COLORS['toolbar_warn_fg']}",
+            "toolbar-bash": f"bg:{COLORS['toolbar_bash_bg']} {COLORS['toolbar_bash_fg']} bold",
+            "toolbar-dim": f"{COLORS['toolbar_dim_fg']}",
+            "prompt": f"{COLORS['prompt']}",
+            "prompt-cont": f"{COLORS['prompt_cont']}",
+        }
+    )
+
+
+def _build_prompt_message() -> HTML:
+    return HTML(f'<style fg="{COLORS["user"]}">></style> ')
+
+
+def apply_theme_to_prompt_session(session_state: SessionState) -> None:
+    """Update prompt session styles after a theme change."""
+    session = session_state.prompt_session
+    if session is None:
+        return
+    if hasattr(session, "app") and session.app is not None:
+        session.app.style = _build_toolbar_style()
+        session.app.invalidate()
 
 
 def create_prompt_session(assistant_id: str, session_state: SessionState) -> PromptSession:
@@ -302,24 +333,13 @@ def create_prompt_session(assistant_id: str, session_state: SessionState) -> Pro
             # Retrigger completion
             buffer.start_completion(select_first=False)
 
-    from prompt_toolkit.styles import Style
+    toolbar_style = _build_toolbar_style()
 
-    # Define styles for the toolbar with full-width background colors
-    toolbar_style = Style.from_dict(
-        {
-            "bottom-toolbar": "noreverse",  # Disable default reverse video
-            "toolbar-green": "bg:#10b981 #000000",  # Green for auto-accept ON
-            "toolbar-orange": "bg:#f59e0b #000000",  # Orange for manual accept
-        }
-    )
-
-    # Create session reference dict for toolbar to access session
     session_ref = {}
 
-    # Create the session
     session = PromptSession(
-        message=HTML(f'<style fg="{COLORS["user"]}">></style> '),
-        multiline=True,  # Keep multiline support but Enter submits
+        message=_build_prompt_message(),
+        multiline=True,
         key_bindings=kb,
         completer=merge_completers(
             [
@@ -330,18 +350,16 @@ def create_prompt_session(assistant_id: str, session_state: SessionState) -> Pro
             ]
         ),
         editing_mode=EditingMode.EMACS,
-        complete_while_typing=True,  # Show completions as you type
-        complete_in_thread=True,  # Async completion prevents menu freezing
+        complete_while_typing=True,
+        complete_in_thread=True,
         mouse_support=False,
-        enable_open_in_editor=True,  # Allow Ctrl+X Ctrl+E to open external editor
-        bottom_toolbar=get_bottom_toolbar(
-            session_state, session_ref
-        ),  # Persistent status bar at bottom
-        style=toolbar_style,  # Apply toolbar styling
-        reserve_space_for_menu=7,  # Reserve space for completion menu to show 5-6 results
+        enable_open_in_editor=True,
+        bottom_toolbar=get_bottom_toolbar(session_state, session_ref),
+        style=toolbar_style,
+        prompt_continuation=None,
+        reserve_space_for_menu=0,
     )
 
-    # Store session reference for toolbar to access
     session_ref["session"] = session
-
+    session_state.prompt_session = session
     return session
