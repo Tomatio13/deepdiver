@@ -1,23 +1,23 @@
 <h1 align="center">Deepdiver CLI</h1>
 <p align="center">AWS Strands Agents SDK を用いた対話型コマンドラインインターフェース</p>
-<p align="center"><strong>Version 0.0.8</strong></p>
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.9%2B-3776AB?logo=python&logoColor=white" alt="Python 3.9+">
+  <img src="https://img.shields.io/badge/CLI-Tool-222222" alt="CLI Tool">
+  <img src="https://img.shields.io/badge/Strands-Agents-2B6CB0" alt="Strands Agents">
+  <img src="https://img.shields.io/badge/MCP-Supported-0B5D7A" alt="MCP Supported">
+  <img src="https://img.shields.io/badge/Skills-Supported-0B5D7A" alt="Skills Supported">
+  <img src="https://img.shields.io/badge/SubAgents-Supported-0B5D7A" alt="SubAgents Supported">
+</p>
 
-## 概要
+## 📌 概要
 
 Deepdiver CLI は、AI エージェントと協働してタスクを実行するための対話型 CLI です。複数エージェントの管理、SubAgents、MCP、Skills を使った拡張に対応します。
 
-## クイックスタート
+<p align="center">
+  <img src="./assets/screen.png" alt="screen" width="700">
+</p>
 
-```bash
-pip install -e .
-
-deepdiver
-```
-
-- モデル設定は `STRANDS_MODEL_PROVIDER` / `STRANDS_MODEL_CONFIG` で行います。
-- `.env` を用意すれば `python-dotenv` が自動読み込みします。
-
-## 機能概要
+## ✨ 機能概要
 
 - エージェントと対話しながらタスクを実行
 - 複数エージェントのプロファイル管理
@@ -25,13 +25,13 @@ deepdiver
 - MCP (Model Context Protocol) による外部ツール連携
 - Skills による手順の再利用
 
-## 必要要件
+## ✅ 必要要件
 
 - Python 3.9+
 - ネットワーク接続（各モデルプロバイダを使う場合）
 - 必要に応じて API キー（Bedrock / OpenAI / Anthropic / Gemini など）
 
-## セットアップ
+## 🧩 セットアップ
 
 ### インストール
 
@@ -60,7 +60,7 @@ uv pip install -e .
 - `requests` - HTTP リクエスト
 - `tabulate>=0.9.0` - テーブル表示
 
-## 環境変数（モデル設定）
+## 🔧 環境変数（モデル設定）
 
 ### 基本
 
@@ -123,7 +123,7 @@ OLLAMA_HOST=http://localhost:11434
 
 </details>
 
-## 使い方
+## ▶️ 使い方
 
 ### 起動
 
@@ -170,7 +170,7 @@ deepdiver help
 - `Ctrl+T` - 自動承認モードの切り替え
 - `Ctrl+C` - 実行を中断
 
-## エージェント管理
+## 🗂️ エージェント管理
 
 CLI は複数のエージェントプロファイルを管理できます。各エージェントは `~/.deepdiver/<agent-name>/` に保存され、独立したメモリとプロンプト設定を持ちます。
 
@@ -182,7 +182,7 @@ deepdiver reset --agent my-agent
 deepdiver reset --agent my-agent --target source-agent
 ```
 
-## SubAgents
+## 🧠 SubAgents
 
 Deepdiver は **SubAgents（サブエージェント）** の仕組みで、専門的なタスクを独立したエージェントに委譲できます。SubAgents は Markdown ファイル（YAML frontmatter 付き）として定義され、**progressive disclosure** 方式で管理されます。
 
@@ -235,7 +235,7 @@ enable_skills: true
 3. 改善提案を具体的に提示する
 ```
 
-## MCP (Model Context Protocol)
+## 🔌 MCP (Model Context Protocol)
 
 Deepdiver は **MCP (Model Context Protocol)** をサポートしており、外部ツールやサービスをエージェントに統合できます。MCP サーバーはエージェントごとに設定され、stdio、SSE (Server-Sent Events)、Streamable HTTP の各トランスポートをサポートします。
 
@@ -282,7 +282,7 @@ Deepdiver は **MCP (Model Context Protocol)** をサポートしており、外
 /mcp
 ```
 
-## Skills
+## 🧰 Skills
 
 Deepdiver は Agent Skills の仕組みを使って、専門的な手順やワークフローを追加できます。Skills は `SKILL.md` を含むフォルダとして管理され、必要なときにだけ読み込まれる **progressive disclosure** 方式です。
 
@@ -298,7 +298,7 @@ Deepdiver は Agent Skills の仕組みを使って、専門的な手順やワ�
 - `$plan 移行計画を立案してください。` のように指定すると、該当スキルの `SKILL.md` を読み込みます
 - `$` を付けない場合は、LLM が文脈から自動選択します（該当時に SKILL.md を読む前提）
 
-## デフォルトツール
+## 🧩 デフォルトツール
 
 CLI には以下のデフォルトツールが組み込まれています。
 
