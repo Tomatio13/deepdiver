@@ -7,6 +7,8 @@ import os
 import time
 import json
 import re
+import shlex
+import subprocess
 import sys
 import uuid
 from pathlib import Path
@@ -43,6 +45,58 @@ def _log_timing(label: str, start_ms: int) -> None:
     if os.environ.get("DEEPDIVER_TIMING") == "1":
         elapsed = _now_ms() - start_ms
         console.print(f"[dim]timing: {label} {elapsed}ms[/dim]")
+
+
+def _parse_notify_command(raw: str) -> list[str] | None:
+    raw = raw.strip()
+    if not raw:
+        return None
+    if raw.startswith("[") or raw.startswith("{"):
+        try:
+            parsed = json.loads(raw)
+        except Exception as exc:
+            toast(f"Notify設定のJSON解析に失敗しました: {exc}", kind="warning")
+            return None
+        if isinstance(parsed, list):
+            parts = parsed
+        else:
+            toast("Notify設定は配列形式で指定してください。", kind="warning")
+            return None
+    else:
+        try:
+            parts = shlex.split(raw)
+        except ValueError as exc:
+            toast(f"Notify設定の解析に失敗しました: {exc}", kind="warning")
+            return None
+    expanded: list[str] = []
+    for part in parts:
+        if part is None:
+            continue
+        text = str(part)
+        expanded.append(os.path.expandvars(os.path.expanduser(text)))
+    return expanded if expanded else None
+
+
+def _run_notify_hook() -> None:
+    raw = os.environ.get("notify")
+    if raw is None:
+        raw = os.environ.get("NOTIFY") or os.environ.get("DEEPDIVER_NOTIFY")
+    if not raw:
+        return
+    cmd = _parse_notify_command(raw)
+    if not cmd:
+        return
+    try:
+        subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except FileNotFoundError:
+        toast(f"Notifyコマンドが見つかりません: {cmd[0]}", kind="warning")
+    except Exception as exc:
+        toast(f"Notifyフックの実行に失敗しました: {exc}", kind="warning")
 
 
 def _normalize_tool_input(tool_input: Any) -> str:
@@ -1181,6 +1235,7 @@ async def execute_task(
                 
                 console.print()
 
+        _run_notify_hook()
         if codex_logger and transcripts_enabled():
             codex_logger.log_message(role="assistant", text=response_text or "")
     except Exception as exc:  # noqa: BLE001
