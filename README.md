@@ -123,6 +123,17 @@ OLLAMA_HOST=http://localhost:11434
 
 </details>
 
+## 🔔 通知フック
+
+エージェントの応答が完了してユーザー操作に戻るタイミングで、任意のコマンドを実行できます。
+
+- 環境変数 `notify` / `NOTIFY` / `DEEPDIVER_NOTIFY` を利用
+- 形式は JSON 配列（コマンド + 引数）
+
+```env
+notify=["cvlc","~/.claude/assets/haneda.mp3","--intf","dummy","--play-and-exit"]
+```
+
 ## ▶️ 使い方
 
 ### 起動
