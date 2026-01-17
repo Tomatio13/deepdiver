@@ -210,6 +210,7 @@ class SessionState:
         self.thinking_status: str | None = None  # "AI Thinking..." など
         self.tool_status: str | None = None  # "Tool executing: {name}..." など
         self._status_obj = None  # rich.status.Status オブジェクト
+        self._status_force_suspended = False
         self.prompt_session = None
 
     def toggle_auto_approve(self) -> bool:
@@ -243,6 +244,10 @@ class SessionState:
             self._status_obj.stop()
             self._status_obj = None
         
+        # ステータスを一時停止中は表示しない
+        if self._status_force_suspended:
+            return
+        
         # 新しいステータスを開始
         if self.tool_status:
             self._status_obj = console.status(
@@ -261,9 +266,24 @@ class SessionState:
         """Clear all status messages."""
         self.thinking_status = None
         self.tool_status = None
+        self._status_force_suspended = False
         if self._status_obj:
             self._status_obj.stop()
             self._status_obj = None
+
+    def force_suspend_status(self) -> None:
+        """Force suspend status display until explicitly released."""
+        self._status_force_suspended = True
+        if self._status_obj:
+            self._status_obj.stop()
+            self._status_obj = None
+
+    def release_force_suspend(self) -> None:
+        """Release force suspension and refresh status display."""
+        if not self._status_force_suspended:
+            return
+        self._status_force_suspended = False
+        self._update_status_display()
 
 
 def get_default_coding_instructions() -> str:

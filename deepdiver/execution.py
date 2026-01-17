@@ -443,18 +443,11 @@ def _render_tool_stream_event(event: dict, session_state=None) -> None:
     data = tool_stream_event.get("data")
     
     if data:
-        # ステータス表示があると同じ行を上書きしやすいので一時停止する
-        restore_tool_status = None
-        if session_state and session_state.tool_status:
-            restore_tool_status = session_state.tool_status
-            session_state.clear_status()
         # ツールからのストリーミングデータを表示
         console.print(
             f"[dim]🔧 Tool '{tool_name}' streaming: {data}[/dim]",
         )
         sys.stdout.flush()
-        if restore_tool_status:
-            session_state.set_tool_status(restore_tool_status)
 
 def _ask_tool_approval_sync(tool_name: str, tool_data: dict) -> bool:
     """Ask user for approval before executing a tool (synchronous version).
@@ -571,7 +564,11 @@ def _handle_tool_use(
     # ツール実行開始時: ステータス表示を開始
     if tool_name:
         session_state.set_thinking_status(None)  # 思考ステータスをクリア
-        session_state.set_tool_status(f"Tool executing: {tool_name}...")
+        # shell系の大量出力はステータス表示が上書きの原因になるため強制停止
+        if tool_name == "shell":
+            session_state.force_suspend_status()
+        else:
+            session_state.set_tool_status(f"Tool executing: {tool_name}...")
         # Tool parameters (same style as "Loaded MCP server: ...")
         if tool_input is not None and tool_use_id and tool_use_id not in _PRINTED_TOOL_PARAMS_IDS:
             normalized: Any = tool_input
@@ -643,6 +640,7 @@ def _handle_tool_complete(session_state) -> None:
     Args:
         session_state: Session state for status management
     """
+    session_state.release_force_suspend()
     # ツール実行完了時: ステータス表示を停止して思考ステータスに切り替え
     session_state.set_tool_status(None)
     session_state.set_thinking_status("Thinking...")
@@ -919,6 +917,8 @@ async def _stream_agent(
                             ),
                         },
                     )
+                    if session_state:
+                        session_state.release_force_suspend()
                 if "tool_complete" in event:
                     complete_payload = event.get("tool_complete")
                     tool_event_logger(
@@ -937,6 +937,8 @@ async def _stream_agent(
                             ),
                         },
                     )
+                    if session_state:
+                        session_state.release_force_suspend()
 
             # 最終結果の取得
             # 注意: resultイベントは複数回発生する可能性があるため、
