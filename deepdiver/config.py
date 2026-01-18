@@ -11,7 +11,8 @@ import dotenv
 from rich.console import Console
 from rich.live import Live
 
-dotenv.load_dotenv()
+# Allow .env to override existing environment variables for local configuration.
+dotenv.load_dotenv(override=True)
 
 THEMES = {
     "dark": {
