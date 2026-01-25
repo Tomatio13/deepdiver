@@ -1,5 +1,7 @@
 """Command handlers for slash commands and bash execution."""
 
+import asyncio
+import os
 import subprocess
 from pathlib import Path
 
@@ -89,6 +91,45 @@ async def handle_command(
 
     if cmd_lower == "help":
         show_interactive_help()
+        return True
+
+    if cmd_lower.startswith("voice"):
+        if session_state is None:
+            toast("Voice command requires an active session", kind="warning")
+            console.print()
+            return True
+
+        parts = stripped_command.split()
+        seconds = None
+        if len(parts) > 1:
+            try:
+                seconds = int(parts[1])
+            except ValueError:
+                toast("Usage: /voice <seconds>", kind="warning")
+                console.print()
+                return True
+
+        if seconds is None:
+            env_default = os.environ.get("DEEPDIVER_VOICE_SECONDS", "").strip()
+            seconds = int(env_default) if env_default.isdigit() else 10
+
+        from .voice import transcribe_from_mic
+
+        console.print()
+        try:
+            text = await asyncio.to_thread(transcribe_from_mic, seconds)
+        except Exception as e:
+            toast(f"Voice transcription failed: {e}", kind="error")
+            console.print()
+            return True
+
+        if text:
+            if session_state.pending_input:
+                session_state.pending_input = f"{session_state.pending_input} {text}"
+            else:
+                session_state.pending_input = text
+            console.print("[green]Transcription ready. Press Enter to edit/send.[/green]")
+        console.print()
         return True
 
     if cmd_lower == "model":

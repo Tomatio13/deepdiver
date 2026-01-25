@@ -151,7 +151,12 @@ async def simple_cli(agent, assistant_id: str | None, session_state):
 
     while True:
         try:
-            user_input = await session.prompt_async()
+            if session_state.pending_input:
+                pending = session_state.pending_input
+                session_state.pending_input = None
+                user_input = await session.prompt_async(default=pending)
+            else:
+                user_input = await session.prompt_async()
             user_input = user_input.strip()
         except EOFError:
             break
