@@ -157,6 +157,7 @@ COMMANDS = {
     "skills": "List or show available skills",
     "subagents": "List or run available subagents",
     "agents": "Alias for subagents",
+    "voice": "Record and transcribe audio into the next prompt",
     "quit": "Exit the CLI",
     "exit": "Exit the CLI",
 }
@@ -213,6 +214,7 @@ class SessionState:
         self._status_obj = None  # rich.status.Status オブジェクト
         self._status_force_suspended = False
         self.prompt_session = None
+        self.pending_input: str | None = None
 
     def toggle_auto_approve(self) -> bool:
         """Toggle auto-approve and return new state."""

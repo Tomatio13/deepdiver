@@ -255,5 +255,6 @@ def show_help() -> None:
     console.print("  /help           Show this summary", style=COLORS["dim"])
     console.print("  /clear          Clear screen", style=COLORS["dim"])
     console.print("  /skills         List or show skills", style=COLORS["dim"])
+    console.print("  /voice          Record and transcribe audio into the next prompt", style=COLORS["dim"])
     console.print("  /quit, /exit    Exit the session", style=COLORS["dim"])
     console.print()

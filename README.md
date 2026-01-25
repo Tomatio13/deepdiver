@@ -30,6 +30,10 @@ Deepdiver CLI は、AI エージェントと協働してタスクを実行する
 - Python 3.9+
 - ネットワーク接続（各モデルプロバイダを使う場合）
 - 必要に応じて API キー（Bedrock / OpenAI / Anthropic / Gemini など）
+- 音声入力（/voice）を使う場合:
+  - Linux（必須対応）
+  - `whisper.cpp` の CLI バイナリ
+  - 録音ツール: `ffmpeg` または `arecord`
 
 ## 🧩 セットアップ
 
@@ -80,6 +84,36 @@ export STRANDS_MODEL_CONFIG='{"model_id": "anthropic.claude-3-5-sonnet-20241022-
 - Anthropic: `ANTHROPIC_MODEL`, `ANTHROPIC_API_KEY`
 - Ollama: `OLLAMA_MODEL` / `OLLAMA_MODEL_ID`, `OLLAMA_HOST`
 - Gemini: `GEMINI_MODEL` / `GEMINI_MODEL_ID`, `GOOGLE_API_KEY` / `GEMINI_API_KEY`
+
+### 音声入力（/voice）用の環境変数（whisper.cpp）
+
+Linuxでのローカル音声入力は `whisper.cpp` CLI を使います。`.env` で設定可能です。
+
+```env
+# whisper.cpp CLI バイナリ（必須: 実行ファイルのフルパス）
+DEEPDIVER_WHISPER_BIN=/path/to/whisper.cpp/build/bin/whisper-cli
+DEEPDIVER_WHISPER_CMD="{bin} -m {model} -f {audio} -l ja -otxt -of {out}"
+
+# モデル設定（未指定なら ggml-base.bin）
+DEEPDIVER_WHISPER_MODEL=ggml-small.bin
+DEEPDIVER_WHISPER_MODEL_DIR=~/.deepdiver/models/whisper
+
+# 録音設定
+DEEPDIVER_VOICE_SECONDS=20
+DEEPDIVER_VOICE_RECORDER=ffmpeg
+
+# 無音自動停止（ffmpegのみ）
+DEEPDIVER_VOICE_SILENCE_SECONDS=2
+DEEPDIVER_VOICE_SILENCE_NOISE=-40dB
+```
+
+補足:
+- `DEEPDIVER_WHISPER_BIN` はディレクトリではなく **実行ファイル** を指定してください。
+- モデルが存在しない場合は自動ダウンロードします。
+- `ffmpeg` を使うと **無音検知で自動停止**が可能です。
+参考: 
+Whieper.cppのインストールやモデルのダウンロード方法、実行方法は以下のサイトを参考にしてみてください。
+[Qiita: 音声認識　Whisper.cppを使ってみた](https://qiita.com/2001at/items/77b243c56743f0baf889)
 
 <details>
 <summary>設定例（.env）</summary>
@@ -180,6 +214,17 @@ deepdiver help
 - `Ctrl+E` - エディタを開く
 - `Ctrl+T` - 自動承認モードの切り替え
 - `Ctrl+C` - 実行を中断
+
+### 音声入力（/voice）
+
+`/voice` コマンドで録音し、whisper.cpp で文字起こしした結果を次の入力欄に挿入します。
+
+```bash
+/voice 10
+```
+
+- 引数は最大録音秒数（未指定時は `DEEPDIVER_VOICE_SECONDS` を使用）
+- `ffmpeg` + `DEEPDIVER_VOICE_SILENCE_SECONDS` を設定すると、無音が続いたら自動停止します
 
 ## 🗂️ エージェント管理
 
