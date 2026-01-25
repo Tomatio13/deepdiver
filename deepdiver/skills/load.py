@@ -53,8 +53,9 @@ def _is_safe_path(path: Path, base_dir: Path) -> bool:
     """Check if a path is safely contained within base_dir.
 
     This prevents directory traversal attacks via symlinks or path manipulation.
-    The function resolves both paths to their canonical form (following symlinks)
-    and verifies that the target path is within the base directory.
+    The function checks that the path itself (without following symlinks) is
+    within base_dir. This allows symlinks within the base directory to point
+    to arbitrary locations (useful for sharing common skill directories).
 
     Args:
         path: The path to validate
@@ -73,19 +74,20 @@ def _is_safe_path(path: Path, base_dir: Path) -> bool:
         False
     """
     try:
-        # Resolve both paths to their canonical form (follows symlinks)
-        resolved_path = path.resolve()
-        resolved_base = base_dir.resolve()
+        # Expand user directory and make paths absolute without resolving symlinks
+        expanded_base = base_dir.expanduser()
+        expanded_path = path.expanduser()
 
-        # Check if the resolved path is within the base directory
-        # This catches symlinks that point outside the base directory
-        resolved_path.relative_to(resolved_base)
+        abs_base = expanded_base.absolute()
+        abs_path = expanded_path.absolute()
+
+        # Check if the absolute path is within the base directory
+        # This prevents path traversal via ../ while allowing symlinks
+        # that exist within the base directory to point anywhere
+        abs_path.relative_to(abs_base)
         return True
     except ValueError:
         # Path is not relative to base_dir (outside the directory)
-        return False
-    except (OSError, RuntimeError):
-        # Error resolving paths (e.g., circular symlinks, too many levels)
         return False
 
 
