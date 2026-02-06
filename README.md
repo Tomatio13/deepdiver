@@ -205,6 +205,9 @@ deepdiver reset --agent my-agent --target source-agent
 
 # ヘルプを表示
 deepdiver help
+
+# tmuxベースの開発チームを起動
+deepdiver team start --roles team-lead,coder,reviewer
 ```
 
 ### キーボードショートカット
@@ -237,6 +240,33 @@ deepdiver reset --agent my-agent
 
 deepdiver reset --agent my-agent --target source-agent
 ```
+
+## 👥 Team（tmux協調）
+
+tmux を使って複数の Deepdiver ワーカーを並列起動し、ロール間でメッセージ通信できます。
+
+```bash
+# 1) セッション開始（tmuxに3ペイン作成）
+deepdiver team start --roles team-lead,coder,reviewer
+
+# 2) team-leadペインにアタッチして対話
+tmux attach -t deepdiver-<session_id>
+# team-leadペインで:
+#   @coder 実装方針を作って
+#   @reviewer コードレビュー観点を整理して
+
+# 3) 外部から送信する場合（team-lead から coder へ）
+deepdiver team send --session <session_id> --from team-lead --to coder -- "このリポジトリをレビューして"
+
+# 4) 返信確認
+deepdiver team inbox --session <session_id> --role team-lead --tail 20
+
+# 5) 停止
+deepdiver team stop --session <session_id>
+```
+
+詳細仕様:
+- `docs/team-architecture-ja.md`
 
 ## 🧠 SubAgents
 

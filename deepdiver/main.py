@@ -19,6 +19,7 @@ from .mcp_tools import load_mcp_tools
 from .skills import execute_skills_command, setup_skills_parser
 from .subagents.commands import execute_subagents_command, setup_subagents_parser
 from .subagents.tools import delegate_to_subagent, delegate_to_subagents_parallel
+from .team_commands import execute_team_command, setup_team_parser
 from .ui import show_help
 
 DEFAULT_TOOLS = [
@@ -104,6 +105,7 @@ def parse_args():
 
     # Subagents command
     setup_subagents_parser(subparsers)
+    setup_team_parser(subparsers)
 
     # Default interactive mode
     parser.add_argument(
@@ -263,6 +265,8 @@ def cli_main():
             execute_skills_command(args)
         elif args.command == "subagents":
             execute_subagents_command(args)
+        elif args.command == "team":
+            execute_team_command(args)
         else:
             # Create session state from args or env
             session_state = SessionState(
