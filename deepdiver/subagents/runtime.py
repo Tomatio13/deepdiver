@@ -20,6 +20,7 @@ from typing import Any
 from strands import Agent
 
 from ..config import COLORS, SENSITIVE_KEYS, console
+from ..security import DefenderSettings, PromptInjectionDefender
 from ..paths import AGENT_ROOT
 from ..skills.load import list_skills
 from ..skills.paths import get_project_skills_dir, get_user_skills_dir
@@ -27,6 +28,8 @@ from ..skills.prompt import build_skills_prompt
 from strands.tools.registry import ToolProvider
 from .load import SubagentMetadata, read_subagent_definition
 from .paths import ensure_user_subagent_runs_dir
+
+_PROMPT_DEFENDER = PromptInjectionDefender(DefenderSettings.from_env())
 
 
 def _now_ts() -> float:
@@ -247,6 +250,35 @@ def _force_allow_file_read(allowed_tools: list[str] | None) -> list[str] | None:
     return allowed
 
 
+def _apply_prompt_defense(task: str) -> tuple[str, bool]:
+    if not _PROMPT_DEFENDER.enabled:
+        return task, False
+
+    decision = _PROMPT_DEFENDER.evaluate(task)
+    categories = ", ".join(decision.categories) if decision.categories else "unknown"
+    if decision.action == "block":
+        console.print(
+            f"[red]Security policy blocked subagent task "
+            f"(score={decision.score:.2f}, categories={categories})[/red]"
+        )
+        return "", True
+
+    if decision.action == "sanitize" and decision.redacted_text is not None:
+        console.print(
+            f"[yellow]Security policy sanitized subagent task "
+            f"(score={decision.score:.2f}, categories={categories})[/yellow]"
+        )
+        return decision.redacted_text, False
+
+    if decision.action == "warn":
+        console.print(
+            f"[yellow]Security warning for subagent task "
+            f"(score={decision.score:.2f}, categories={categories})[/yellow]"
+        )
+
+    return task, False
+
+
 async def _invoke_agent(agent: Any, prompt: str) -> str:
     if hasattr(agent, "invoke_async"):
         resp = await agent.invoke_async(prompt)
@@ -275,6 +307,7 @@ async def run_subagent(
     runs_dir = ensure_user_subagent_runs_dir()
     transcript_path = runs_dir / f"agent-{run_id}.jsonl"
     store = TranscriptStore(transcript_path)
+    secured_task, blocked = _apply_prompt_defense(task)
 
     # Load sub-agent definition body (system prompt memory)
     md_path = Path(subagent["path"])
@@ -365,9 +398,9 @@ async def run_subagent(
 
     # Apply skills discovery / explicit $skill selection (if enabled)
     skill_prompt = None
-    cleaned_task = task
+    cleaned_task = secured_task
     if enable_skills:
-        skill_prompt, cleaned_task = _extract_skill_prefix(task, assistant_id)
+        skill_prompt, cleaned_task = _extract_skill_prefix(secured_task, assistant_id)
 
     final_prompt = cleaned_task.strip()
     if resume_text:
@@ -395,6 +428,20 @@ async def run_subagent(
         store.append({"ts": _now_ts(), "event": "tools_policy", "tools": allowed_tools})
     if resume_from:
         store.append({"ts": _now_ts(), "event": "resume", "from": resume_from})
+
+    if blocked:
+        blocked_msg = "Blocked by security policy before subagent execution."
+        store.append(
+            {
+                "ts": _now_ts(),
+                "event": "security_blocked",
+                "reason": blocked_msg,
+            }
+        )
+        store.append({"ts": _now_ts(), "role": "assistant", "content": blocked_msg})
+        store.append({"ts": _now_ts(), "event": "run_end", "run_id": run_id})
+        run = SubagentRun(run_id=run_id, subagent_name=subagent["name"], transcript_path=transcript_path)
+        return run, blocked_msg
 
     store.append({"ts": _now_ts(), "role": "user", "content": final_prompt})
 

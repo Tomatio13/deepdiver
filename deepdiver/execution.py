@@ -24,6 +24,7 @@ from rich.text import Text
 
 from .config import COLORS, SENSITIVE_KEYS, console
 from .input import parse_file_mentions
+from .security import DefenderSettings, PromptInjectionDefender
 from .skills.load import list_skills
 from .skills.paths import get_project_skills_dir, get_user_skills_dir
 from .ui import render_todos_panel, toast
@@ -35,6 +36,7 @@ _LAST_TOOL_REQUEST: dict[str, float] = {}
 _LAST_TOOL_NAME_REQUEST: dict[str, tuple[float, str]] = {}
 _LAST_TOOL_APPROVAL: dict[str, float] = {}
 _SKILLS_DISCOVERY_CACHE: dict[str, str | None] = {}
+_PROMPT_DEFENDER = PromptInjectionDefender(DefenderSettings.from_env())
 
 
 def _now_ms() -> int:
@@ -280,6 +282,37 @@ def _assemble_prompt(user_input: str) -> str:
             console.print(f"[red]Error reading {file_path.name}: {exc}[/red]")
 
     return "\n".join(context_parts)
+
+
+def _apply_prompt_defense(user_input: str) -> tuple[str, bool]:
+    if not _PROMPT_DEFENDER.enabled:
+        return user_input, False
+
+    decision = _PROMPT_DEFENDER.evaluate(user_input)
+    if decision.action == "block":
+        cats = ", ".join(decision.categories) if decision.categories else "unknown"
+        toast(
+            f"Security policy blocked input (score={decision.score:.2f}, categories={cats})",
+            kind="error",
+        )
+        return "", True
+
+    if decision.action == "sanitize" and decision.redacted_text is not None:
+        cats = ", ".join(decision.categories) if decision.categories else "unknown"
+        toast(
+            f"Security policy sanitized input (score={decision.score:.2f}, categories={cats})",
+            kind="warning",
+        )
+        return decision.redacted_text, False
+
+    if decision.action == "warn":
+        cats = ", ".join(decision.categories) if decision.categories else "unknown"
+        toast(
+            f"Security warning (score={decision.score:.2f}, categories={cats})",
+            kind="warning",
+        )
+
+    return user_input, False
 
 
 def _extract_skill_prefix(user_input: str, assistant_id: str | None) -> tuple[str | None, str]:
@@ -1055,9 +1088,13 @@ async def execute_task(
 ):
     """Execute a task by delegating to the Strands agent."""
     task_start_ms = _now_ms()
+    secured_input, blocked = _apply_prompt_defense(user_input)
+    if blocked:
+        _log_timing("execute_task_total", task_start_ms)
+        return
 
     t0 = _now_ms()
-    skill_prompt, cleaned_input = _extract_skill_prefix(user_input, assistant_id)
+    skill_prompt, cleaned_input = _extract_skill_prefix(secured_input, assistant_id)
     _log_timing("extract_skill_prefix", t0)
     t0 = _now_ms()
     final_input = _assemble_prompt(cleaned_input)
@@ -1081,7 +1118,7 @@ async def execute_task(
             cwd=str(Path.cwd()),
             approval_policy=approval_policy,
         )
-        codex_logger.log_message(role="user", text=user_input or "")
+        codex_logger.log_message(role="user", text=secured_input or "")
 
     def tool_event_logger(event: str, data: dict[str, Any]) -> None:
         if not codex_logger or not transcripts_enabled():

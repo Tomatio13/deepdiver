@@ -98,15 +98,10 @@ def reset_agent(agent_name: str, source_agent: str | None = None) -> None:
 
 def _base_cli_prompt(agent_dir: Path) -> str:
     memory_dir = agent_dir / MEMORY_DIRNAME
-    cwd = Path.cwd()
-    working_dir = cwd.name+"/"+"workspace"
     return f"""### CLI Runtime Context
 
-- Working directory: `{working_dir}`
 - Agent profile directory: `{agent_dir}`
 - Persistent memory directory: `{memory_dir}`
-- If working directory is not `{working_dir}`, create it and use it.
-- If working directory is `{working_dir}`, use it.
 """
 
 

@@ -12,7 +12,9 @@ deepdiver/input.py
 deepdiver/main.py
 deepdiver/mcp_tools.py
 deepdiver/paths.py
+deepdiver/transcripts.py
 deepdiver/ui.py
+deepdiver/voice.py
 deepdiver_cli.egg-info/PKG-INFO
 deepdiver_cli.egg-info/SOURCES.txt
 deepdiver_cli.egg-info/dependency_links.txt

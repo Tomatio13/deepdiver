@@ -1,371 +1,217 @@
-<h1 align="center">Deepdiver CLI</h1>
-<p align="center">AWS Strands Agents SDK を用いた対話型コマンドラインインターフェース</p>
+<h1 align="center">Deepdiver CLI（パッケージ）</h1>
+<p align="center">Strands Agents SDK ベースの対話型CLI実装</p>
+
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.9%2B-3776AB?logo=python&logoColor=white" alt="Python 3.9+">
-  <img src="https://img.shields.io/badge/CLI-Tool-222222" alt="CLI Tool">
+  <a href="README.md"><img src="https://img.shields.io/badge/ドキュメント-日本語-white.svg" alt="JA doc"/></a>
+  <a href="README_EN.md"><img src="https://img.shields.io/badge/english-document-white.svg" alt="EN doc"></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/Strands-Agents-2B6CB0" alt="Strands Agents">
   <img src="https://img.shields.io/badge/MCP-Supported-0B5D7A" alt="MCP Supported">
   <img src="https://img.shields.io/badge/Skills-Supported-0B5D7A" alt="Skills Supported">
   <img src="https://img.shields.io/badge/SubAgents-Supported-0B5D7A" alt="SubAgents Supported">
 </p>
 
-## 📌 概要
-
-Deepdiver CLI は、AI エージェントと協働してタスクを実行するための対話型 CLI です。複数エージェントの管理、SubAgents、MCP、Skills を使った拡張に対応します。
-
 <p align="center">
-  <img src="./assets/screen.png" alt="screen" width="700">
+  <img src="./assets/screen.png" alt="Deepdiver CLI screen" width="760">
 </p>
+<p align="center">Reference: [Image #1]</p>
 
-## ✨ 機能概要
+このパッケージは、Strands Agents SDK 上に Deepdiver の対話型 CLI を実装したものです。ファイルシステム、シェル、HTTP などの共通ツールをラップし、エージェントプロファイル、Skills、SubAgents、MCP連携、JSONLトランスクリプトを提供します。
 
-- エージェントと対話しながらタスクを実行
-- 複数エージェントのプロファイル管理
-- SubAgents による専門タスクの委譲
-- MCP (Model Context Protocol) による外部ツール連携
-- Skills による手順の再利用
+## 🧱 アーキテクチャ概要
 
-## ✅ 必要要件
+```text
+deepdiver/
+├── __init__.py            # パッケージ公開API
+├── __main__.py            # `python -m deepdiver` のエントリーポイント
+├── agent.py               # エージェントライフサイクル（保存、プロンプト、リセット）
+├── commands.py            # スラッシュコマンドとシェル連携
+├── config.py              # 色設定、コンソール、モデル選択ヘルパー
+├── csv_tool.py            # CSVフィルタリングヘルパー
+├── default_agent_prompt.md
+├── execution.py           # タスク実行とストリーミング補助
+├── input.py               # prompt_toolkit設定と補完
+├── main.py                # CLI全体制御 / 引数解析
+├── mcp_tools.py           # MCPツール読み込み / エラーフィルタ
+├── paths.py               # 共通パス（AGENT_ROOT, プロジェクトルート）
+├── transcripts.py         # JSONLトランスクリプト + Codexロールアウトログ
+├── ui.py                  # ヘルプ表示レンダラー
+├── skills/                # Skillsシステム
+├── subagents/             # SubAgentsシステム
+└── examples/              # サンプル
+```
 
-- Python 3.9+
-- ネットワーク接続（各モデルプロバイダを使う場合）
-- 必要に応じて API キー（Bedrock / OpenAI / Anthropic / Gemini など）
-- 音声入力（/voice）を使う場合:
-  - Linux（必須対応）
-  - `whisper.cpp` の CLI バイナリ
-  - 録音ツール: `ffmpeg` または `arecord`
+## 🔑 主要モジュール
 
-## 🧩 セットアップ
+- **`agent.py`**: `~/.deepdiver/<agent>/` をバックエンドとして Strands `Agent` を生成。プロファイル一覧、リセット、システムプロンプト構築（`AGENT.md` を含む）を扱います。
+- **`config.py`**: 環境変数読み込み、共通コンソール/色設定、`STRANDS_MODEL_PROVIDER` / `STRANDS_MODEL_CONFIG` によるモデル解決を提供します。
+- **`execution.py`**: リクエスト正規化、参照ファイル文脈の注入、ストリーミング実行、非ストリーミングへのフォールバックを扱います。
+- **`main.py`**: CLIフラグ解析、依存チェック、デフォルトツール登録、MCPツール読み込み、対話ループ実行を担います。
+- **`mcp_tools.py`**: MCPツールを読み込み、ノイズの多いトランスポートエラーを抑制します。
+- **`transcripts.py`**: JSONLトランスクリプトと Codex 互換ロールアウトログを書き込みます。
+- **`skills/`**: Progressive disclosure 型の Skills システムと `/skills` コマンド。
+- **`subagents/`**: SubAgents 定義、実行ランタイム、`/subagents` コマンド。
 
-### インストール
+## 📦 エージェント保存先とプロンプト
+
+- エージェントは `~/.deepdiver/<agent-name>/` 配下に保存されます。
+- `AGENT.md` に長期指示を保存し、補助コンテキスト用に `memories/` サブディレクトリが作成されます。
+- エージェントをリセットするとディレクトリを削除し、デフォルトプロンプトへ復元（または別エージェントの指示をコピー）します。
+
+## 🧰 デフォルトツール
+
+`main.py` は既定で以下の Strands ツールを登録します。
+
+- `file_read`, `file_write`, `editor` - ファイルシステム操作
+- `shell` - ターミナルコマンド実行（承認フローあり）
+- `http_request` - 軽量HTTPリクエスト
+- `environment` - 環境変数アクセス
+- `calculator`, `current_time` - ユーティリティ
+- `filter_csv_data` - CSVフィルタリング
+- `delegate_to_subagent`, `delegate_to_subagents_parallel` - SubAgents委譲
+
+`create_agent_with_config` を呼ぶ前に `DEFAULT_TOOLS` を拡張すれば、追加ツールを登録できます。
+
+## 📝 JSONLトランスクリプト
+
+トランスクリプトが有効な場合、CLI は `~/.deepdiver/` 配下にログを書き込みます。
+
+- メインエージェント実行: `~/.deepdiver/<agent>/runs/agent-<run_id>.jsonl`
+- ロールアウトセッション: `~/.deepdiver/sessions/YYYY/MM/DD/rollout-<timestamp>-<session_id>.jsonl`
+
+無効化する場合:
 
 ```bash
-pip install --upgrade pip
-pip install -e .
+export DEEPDIVER_TRANSCRIPT=0
 ```
 
-`uv` を利用する場合:
+## ⌨️ 対話コマンド
 
-```bash
-uv pip install -e .
-```
+- `/help` - ショートカットとツールの概要表示
+- `/skills` - Skills の管理と探索
+- `/subagents` - SubAgents の管理
+- `/mcp` - MCP サーバーステータス表示
+- `/clear` - ターミナルクリア
+- `/quit` または `/exit` - セッション終了
+- `!<command>` - シェルコマンド実行（例: `!git status`）
 
-### 主要依存パッケージ
+## 🔌 MCP連携（設定方法）
 
-- `strands-agents>=0.2.0` - Strands Agents SDK
-- `strands-agents-tools>=0.2.0` - Strands ツールセット
-- `boto3>=1.34.0` - Amazon Bedrock など AWS 連携向け
-- `openai` - OpenAI API クライアント
-- `pandas>=2.0.0` - データ分析
-- `rich>=13.0.0` - リッチなターミナル出力
-- `prompt-toolkit>=3.0.52` - 対話型入力
-- `python-dotenv` - 環境変数管理
-- `mcp` - Model Context Protocol サポート
-- `requests` - HTTP リクエスト
-- `tabulate>=0.9.0` - テーブル表示
+Deepdiver はエージェント単位で MCP 設定を読み込みます。
 
-## 🔧 環境変数（モデル設定）
+- 設定ファイル: `~/.deepdiver/<agent-name>/mcp.json`
+- 確認コマンド: `/mcp`
+- 形式: ルートに `mcpServers` を置き、各サーバーに `url` か `command` のどちらかを指定
 
-### 基本
-
-```bash
-export STRANDS_MODEL_PROVIDER=bedrock
-export STRANDS_MODEL_CONFIG='{"model_id": "anthropic.claude-3-5-sonnet-20241022-v2:0", "region_name": "us-east-1"}'
-```
-
-- `STRANDS_MODEL_PROVIDER` 未指定の場合は、Strands Agent 側のデフォルト設定が利用されます。
-- `STRANDS_MODEL_CONFIG` は JSON 文字列または JSON ファイルパスを指定できます。
-- `.env` を利用する場合は `python-dotenv` により自動で読み込まれます。
-
-### プロバイダ別の補助環境変数
-
-- Bedrock: `BEDROCK_MODEL_ID` / `STRANDS_MODEL_ID`, `BEDROCK_REGION` / `AWS_REGION`
-- OpenAI: `OPENAI_MODEL` / `OPENAI_MODEL_ID`, `OPENAI_API_KEY`, `OPENAI_BASE_URL`
-- Anthropic: `ANTHROPIC_MODEL`, `ANTHROPIC_API_KEY`
-- Ollama: `OLLAMA_MODEL` / `OLLAMA_MODEL_ID`, `OLLAMA_HOST`
-- Gemini: `GEMINI_MODEL` / `GEMINI_MODEL_ID`, `GOOGLE_API_KEY` / `GEMINI_API_KEY`
-
-### 音声入力（/voice）用の環境変数（whisper.cpp）
-
-Linuxでのローカル音声入力は `whisper.cpp` CLI を使います。`.env` で設定可能です。
-
-```env
-# whisper.cpp CLI バイナリ（必須: 実行ファイルのフルパス）
-DEEPDIVER_WHISPER_BIN=/path/to/whisper.cpp/build/bin/whisper-cli
-DEEPDIVER_WHISPER_CMD="{bin} -m {model} -f {audio} -l ja -otxt -of {out}"
-
-# モデル設定（未指定なら ggml-base.bin）
-DEEPDIVER_WHISPER_MODEL=ggml-small.bin
-DEEPDIVER_WHISPER_MODEL_DIR=~/.deepdiver/models/whisper
-
-# 録音設定
-DEEPDIVER_VOICE_SECONDS=20
-DEEPDIVER_VOICE_RECORDER=ffmpeg
-
-# 無音自動停止（ffmpegのみ）
-DEEPDIVER_VOICE_SILENCE_SECONDS=2
-DEEPDIVER_VOICE_SILENCE_NOISE=-40dB
-```
-
-補足:
-- `DEEPDIVER_WHISPER_BIN` はディレクトリではなく **実行ファイル** を指定してください。
-- モデルが存在しない場合は自動ダウンロードします。
-- `ffmpeg` を使うと **無音検知で自動停止**が可能です。
-参考: 
-Whieper.cppのインストールやモデルのダウンロード方法、実行方法は以下のサイトを参考にしてみてください。
-[Qiita: 音声認識　Whisper.cppを使ってみた](https://qiita.com/2001at/items/77b243c56743f0baf889)
-
-<details>
-<summary>設定例（.env）</summary>
-
-#### OpenAI API
-
-```env
-STRANDS_MODEL_PROVIDER=openai
-OPENAI_MODEL=gpt-4o-mini
-OPENAI_API_KEY=sk-your-openai-key
-STRANDS_MODEL_CONFIG='{"model_id": "gpt-4o-mini", "params": {"temperature": 0.2}}'
-```
-
-#### OpenAI互換（LiteLLMなど）
-
-```env
-STRANDS_MODEL_PROVIDER=openai
-OPENAI_MODEL_ID=gpt-4o-mini
-OPENAI_API_KEY=your-api-key
-OPENAI_BASE_URL=http://localhost:4000/v1
-# STRANDS_MODEL_CONFIG='{"client_args": {"api_key": "your-api-key", "base_url": "http://localhost:4000/v1"}, "model_id": "gpt-4o-mini"}'
-```
-
-#### Gemini
-
-```env
-STRANDS_MODEL_PROVIDER=gemini
-GEMINI_MODEL_ID=gemini-2.5-flash
-GOOGLE_API_KEY=your-google-api-key
-# STRANDS_MODEL_CONFIG='{"client_args": {"api_key": "your-google-api-key"}, "model_id": "gemini-2.5-flash", "params": {"temperature": 0.7, "max_output_tokens": 2048}}'
-```
-
-#### Ollama
-
-```env
-STRANDS_MODEL_PROVIDER=ollama
-OLLAMA_MODEL_ID=llama3.1
-OLLAMA_HOST=http://localhost:11434
-# STRANDS_MODEL_CONFIG='{"model_id": "llama3.1", "host": "http://localhost:11434"}'
-```
-
-</details>
-
-## 🔔 通知フック
-
-エージェントの応答が完了してユーザー操作に戻るタイミングで、任意のコマンドを実行できます。
-
-- 環境変数 `notify` / `NOTIFY` / `DEEPDIVER_NOTIFY` を利用
-- 形式は JSON 配列（コマンド + 引数）
-
-```env
-notify=["cvlc","~/.claude/assets/haneda.mp3","--intf","dummy","--play-and-exit"]
-```
-
-## ▶️ 使い方
-
-### 起動
-
-```bash
-# モジュールとして実行
-python -m deepdiver
-
-# uv を使用する場合
-uv run python -m deepdiver
-
-# インストール後はコマンドとして実行可能
-deepdiver
-# または
-deepdiver-cli
-```
-
-### CLIオプション（例）
-
-```bash
-# エージェントを指定して起動（デフォルト: agent）
-deepdiver --agent my-agent
-
-# ツール使用時の承認を自動化（人間の確認なしで実行）
-deepdiver --auto-approve
-
-# 利用可能なエージェント一覧を表示
-deepdiver list
-
-# エージェントをリセット
-deepdiver reset --agent my-agent
-
-# 別のエージェントからプロンプトをコピーしてリセット
-deepdiver reset --agent my-agent --target source-agent
-
-# ヘルプを表示
-deepdiver help
-```
-
-### キーボードショートカット
-
-- `Enter` - 入力を送信
-- `Alt+Enter` - 改行を挿入
-- `Ctrl+E` - エディタを開く
-- `Ctrl+T` - 自動承認モードの切り替え
-- `Ctrl+C` - 実行を中断
-
-### 音声入力（/voice）
-
-`/voice` コマンドで録音し、whisper.cpp で文字起こしした結果を次の入力欄に挿入します。
-
-```bash
-/voice 10
-```
-
-- 引数は最大録音秒数（未指定時は `DEEPDIVER_VOICE_SECONDS` を使用）
-- `ffmpeg` + `DEEPDIVER_VOICE_SILENCE_SECONDS` を設定すると、無音が続いたら自動停止します
-
-## 🗂️ エージェント管理
-
-CLI は複数のエージェントプロファイルを管理できます。各エージェントは `~/.deepdiver/<agent-name>/` に保存され、独立したメモリとプロンプト設定を持ちます。
-
-```bash
-deepdiver list
-
-deepdiver reset --agent my-agent
-
-deepdiver reset --agent my-agent --target source-agent
-```
-
-## 🧠 SubAgents
-
-Deepdiver は **SubAgents（サブエージェント）** の仕組みで、専門的なタスクを独立したエージェントに委譲できます。SubAgents は Markdown ファイル（YAML frontmatter 付き）として定義され、**progressive disclosure** 方式で管理されます。
-
-### ディレクトリ構成
-
-- ユーザー SubAgents: `~/.deepdiver/subagents/`
-- プロジェクト SubAgents: `.deepdiver/subagents/`（git ルート配下、同名があればこちらが優先）
-
-### 作成と実行
-
-```bash
-# ユーザー SubAgent を作成
-deepdiver subagents create my-subagent
-
-# プロジェクト SubAgent を作成
-deepdiver subagents create my-subagent --project
-
-# SubAgent を直接実行
-deepdiver subagents run my-subagent --agent agent -- "タスクの説明"
-
-# 以前の実行を再開
-deepdiver subagents resume <run_id> my-subagent --agent agent -- "続きのタスク"
-```
-
-### 定義ファイルの形式
-
-```md
----
-name: code-reviewer
-description: コードレビューを専門に行うサブエージェント
-tools: file_read,editor
-enable_skills: true
----
-
-# Code Reviewer
-
-## Purpose
-
-コードレビューを専門に行い、バグや改善点を指摘します。
-
-## When to Use
-
-- コードの品質チェックが必要な場合
-- セキュリティ問題の検出が必要な場合
-
-## Instructions
-
-1. コードを読み込み、構造を理解する
-2. バグ、セキュリティ問題、パフォーマンス問題を検出
-3. 改善提案を具体的に提示する
-```
-
-## 🔌 MCP (Model Context Protocol)
-
-Deepdiver は **MCP (Model Context Protocol)** をサポートしており、外部ツールやサービスをエージェントに統合できます。MCP サーバーはエージェントごとに設定され、stdio、SSE (Server-Sent Events)、Streamable HTTP の各トランスポートをサポートします。
-
-### 設定方法
-
-**設定ファイルの場所**: `~/.deepdiver/<agent-name>/mcp.json`
+最小例（HTTP/SSE）:
 
 ```json
 {
   "mcpServers": {
-    "taivily": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-taivily"],
+    "docs": {
+      "url": "http://localhost:8080/sse"
+    }
+  }
+}
+```
+
+最小例（stdio）:
+
+```json
+{
+  "mcpServers": {
+    "local": {
+      "command": "node",
+      "args": ["./server.js"],
       "env": {
-        "TAIVILY_API_KEY": "your-api-key"
+        "API_KEY": "your_key"
       }
     }
   }
 }
 ```
 
-### トランスポートタイプ
+補足:
 
-- stdio（標準入出力）
-- SSE (Server-Sent Events)
-- Streamable HTTP
+- `url` が `/sse` なら SSE として扱われます。
+- それ以外の `url` は Streamable HTTP として扱われます。
+- 接続に失敗した MCP サーバーは警告表示のうえスキップされ、CLI 全体は継続します。
 
-### MCP サーバーの無効化
+## 🧩 Agent Skills（設定方法）
 
-```json
-{
-  "mcpServers": {
-    "server-name": {
-      "command": "...",
-      "disabled": true
-    }
-  }
-}
+Skills は `SKILL.md` を持つディレクトリ単位で読み込まれます。
+
+- ユーザーSkills: `~/.deepdiver/<agent-name>/skills/`
+- プロジェクトSkills: `<git-root>/.deepdiver/skills/`
+- 優先順位: 同名の場合は **プロジェクトSkillsが優先**
+- 確認コマンド: `/skills`
+
+ディレクトリ例:
+
+```text
+~/.deepdiver/agent/skills/
+└── my-skill/
+    └── SKILL.md
 ```
 
-### CLI 内での確認
+`SKILL.md` 最小例:
 
+```markdown
+---
+name: my-skill
+description: Explain how and when to use this skill.
+---
+
+# My Skill
+Use this workflow when the user asks for ...
 ```
-/mcp
+
+使い方:
+
+- `/skills` で一覧表示
+- `/skills <name>` で詳細表示
+- 入力先頭で `$my-skill` を付けて実行（例: `$my-skill この課題を整理して`）
+
+## 🚀 開発時の実行
+
+```bash
+# プロジェクトルートから
+uv run python -m deepdiver
+
+# または editable install
+uv pip install -e .
+deepdiver
 ```
 
-## 🧰 Skills
+## ⚙️ モデル設定
 
-Deepdiver は Agent Skills の仕組みを使って、専門的な手順やワークフローを追加できます。Skills は `SKILL.md` を含むフォルダとして管理され、必要なときにだけ読み込まれる **progressive disclosure** 方式です。
+環境変数でモデル設定を行います。例:
 
-### ディレクトリ構成
+```bash
+export STRANDS_MODEL_PROVIDER=bedrock
+export STRANDS_MODEL_CONFIG='{"model_id": "anthropic.claude-3-5-sonnet-20241022-v2:0", "region_name": "us-east-1"}'
+```
 
-- ユーザー技能: `~/.deepdiver/<agent>/skills/`
-- プロジェクト技能: `.deepdiver/skills/`（git ルート配下）
+OpenAI / Anthropic 系プロバイダでは既存のAPIキー変数（`OPENAI_API_KEY`, `ANTHROPIC_API_KEY` など）をそのまま使えます。`STRANDS_MODEL_PROVIDER` を省略すると、Strands Agent 側のデフォルト解決が使われます。
 
-### 使い方
+## 🛡️ Prompt Injection Defender
 
-- `/skills` でスキル一覧を表示
-- `/skills` → Tab で `$skill ` を挿入して続けて入力
-- `$plan 移行計画を立案してください。` のように指定すると、該当スキルの `SKILL.md` を読み込みます
-- `$` を付けない場合は、LLM が文脈から自動選択します（該当時に SKILL.md を読む前提）
+CLI はユーザー入力 / SubAgents入力に対する軽量な prompt-injection 防御機能を備えています。
 
-## 🧩 デフォルトツール
+```bash
+export DEFENDER_ENABLED=true
+export DEFENDER_DEFAULT_MODE=warn
+export DEFENDER_WARN_THRESHOLD=0.35
+export DEFENDER_BLOCK_THRESHOLD=0.95
+export DEFENDER_SANITIZE_MODE=full-redact
+```
 
-CLI には以下のデフォルトツールが組み込まれています。
+- `DEFENDER_DEFAULT_MODE`: `warn`, `sanitize`, `block`
+- `DEFENDER_SANITIZE_MODE`: 現在は `full-redact` のみサポート
 
-- `file_read` - ファイルの読み込み
-- `file_write` - ファイルの書き込み
-- `editor` - エディタでの編集
-- `shell` - シェルコマンドの実行
-- `http_request` - HTTP リクエストの送信
-- `environment` - 環境変数の取得
-- `calculator` - 計算の実行
-- `current_time` - 現在時刻の取得
-- `filter_csv_data` - CSV データのフィルタリング
+## 📚 用語統一
 
-MCP サーバーが設定されている場合、追加のツールも利用可能です。
+このREADMEでは、複数形を含む機能名は **`SubAgents`** に統一して表記します。
