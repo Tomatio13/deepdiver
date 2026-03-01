@@ -7,7 +7,8 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from .config import COLORS, COMMANDS, DEEPDIVER_ASCII, console
+from .banner_display import print_deepdiver_banner
+from .config import COLORS, COMMANDS, console
 
 # ToDo表示用のアイコンとスタイル
 TODO_ICON = {"pending": "○", "in_progress": "◔", "done": "✓", "completed": "✓"}
@@ -220,8 +221,7 @@ def show_help() -> None:
     """Show help information."""
 
     console.print()
-    console.print(DEEPDIVER_ASCII, style=f"{COLORS['primary']}")
-    console.print()
+    print_deepdiver_banner()
 
     console.print("[bold]Usage:[/bold]", style=COLORS["primary"])
     console.print("  deepdiver [--agent NAME] [--auto-approve]      Start interactive session")
