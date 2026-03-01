@@ -6,9 +6,9 @@ import subprocess
 from pathlib import Path
 
 from .agent import AGENT_ROOT
+from .banner_display import print_deepdiver_banner
 from .config import (
     COLORS,
-    DEEPDIVER_ASCII,
     apply_theme,
     console,
     get_current_model_info,
@@ -80,8 +80,7 @@ async def handle_command(
     if cmd_lower == "clear":
         # Clear screen and show fresh UI
         console.clear()
-        console.print(DEEPDIVER_ASCII, style=f"{COLORS['primary']}")
-        console.print()
+        print_deepdiver_banner()
         console.print(
             "... Fresh start! Screen cleared. Conversation state will continue in the current session.",
             style=COLORS["agent"],

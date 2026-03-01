@@ -9,8 +9,9 @@ from pathlib import Path
 from strands_tools import editor, environment, file_read, file_write, http_request, shell,calculator,current_time
 
 from .agent import create_agent_with_config, list_agents, reset_agent
+from .banner_display import print_deepdiver_banner
 from .commands import execute_bash_command, handle_command
-from .config import COLORS, DEEPDIVER_ASCII, SessionState, console, create_model
+from .config import COLORS, SessionState, console, create_model
 from .csv_tool import filter_csv_data
 from .execution import execute_task
 from .transcripts import CodexRolloutLogger, transcripts_enabled
@@ -123,8 +124,7 @@ def parse_args():
 async def simple_cli(agent, assistant_id: str | None, session_state):
     """Main CLI loop."""
     console.clear()
-    console.print(DEEPDIVER_ASCII, style=f"{COLORS['primary']}")
-    console.print()
+    print_deepdiver_banner()
 
     console.print("... Ready to Innovation! What would you like to create?", style=COLORS["agent"])
     console.print(f"  [dim]Working directory: {Path.cwd()}[/dim]")
